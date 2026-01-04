@@ -1,0 +1,31 @@
+{
+  "name": "privacy-perf-comparisons",
+  "version": "0.0.1",
+  "description": "Automated comparisons of browser performance.",
+  "license": "ISC",
+  "author": "Peter Snyder <pes@brave.com>",
+  "type": "module",
+  "main": "out/run.js",
+  "scripts": {
+    "build": "npx tsc",
+    "clean": "rm -Rf out/*",
+    "lint": "npx eslint src/*.ts",
+    "lint:fix": "npx eslint --fix src/**/*.ts src/*.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@stylistic/eslint-plugin": "^5.6.1",
+    "@tsconfig/node24": "^24.0.3",
+    "@types/argparse": "^2.0.17",
+    "@types/eslint__js": "^8.42.3",
+    "@types/node": "^25.0.3",
+    "@typescript-eslint/parser": "^8.51.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.51.0"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.57.0",
+    "argparse": "^2.0.1"
+  }
+}

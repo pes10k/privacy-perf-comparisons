@@ -1,0 +1,12 @@
+{
+    "extends": "@tsconfig/node24/tsconfig.json",
+    "compilerOptions": {
+        "lib": [ "dom", "es2024" ],
+        "target": "es2024",
+        "outDir": "./out"
+    },
+    "include": [
+        "./src/*.ts",
+        "./src/**/*.ts"
+    ]
+}
