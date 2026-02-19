@@ -1,37 +1,27 @@
-import eslint from '@eslint/js'
-import tseslint from 'typescript-eslint'
-import stylistic from '@stylistic/eslint-plugin'
+import eslint from '@eslint/js';
+import { defineConfig } from 'eslint/config';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
+import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+
+export default defineConfig(
   eslint.configs.recommended,
-  ...tseslint.configs.strict,
-  ...tseslint.configs.stylistic,
-  stylistic.configs['recommended'],
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
-    rules: {
-      '@typescript-eslint/no-unused-vars': ['error', {
-        "caughtErrorsIgnorePattern": "ignore"
-      }],
-      'camelcase': ['error', {
-        'properties': 'never'
-      }]
-    }
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
   },
   {
-    plugins: {
-      '@stylistic': stylistic
-    },
     rules: {
-      "@stylistic/indent": ["error", 2, {
-        "FunctionExpression": {
-          "parameters": "first"
-        },
-        "CallExpression" : {
-          "arguments": "first",
-        },
-        "ArrayExpression": "first",
-      }],
-      "@stylistic/space-before-function-paren": ["error", "always"],
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
     }
-  }
-)
+  },
+  eslintPluginPrettierRecommended,
+);

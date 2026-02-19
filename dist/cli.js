@@ -1,73 +1,82 @@
 #!/usr/bin/env node
-import { ArgumentParser, ArgumentDefaultsHelpFormatter } from 'argparse';
-import { launch } from './browser.js';
-import { runConfigForArgs } from './config.js';
-import { getLogger } from './logging.js';
-import { measureURL } from './measure.js';
-import { BrowserType, LoggingLevel } from './types.js';
+import { ArgumentParser, ArgumentDefaultsHelpFormatter } from "argparse";
+import { launch } from "./browser.js";
+import { runConfigForArgs } from "./config.js";
+import { getLogger, LoggingLevel } from "./logging.js";
+import { measureURL } from "./measure.js";
+import { BrowserType, MeasurementType } from "./types.js";
 const parser = new ArgumentParser({
-    description: 'Run performance tests for a playwright version of a browser.',
+    description: "Run performance tests for a playwright version of a browser.",
     formatter_class: ArgumentDefaultsHelpFormatter,
 });
-parser.add_argument('-b', '--browser', {
+parser.add_argument("-b", "--browser", {
     choices: Object.values(BrowserType),
-    help: 'Which browser family to use for this test.',
     default: BrowserType.Brave,
+    help: "Which browser family to use for this test.",
 });
-parser.add_argument('-d', '--user-data-dir', {
-    help: 'Path to the user data directory to load and save persistent state '
-        + 'to. For chromium browsers, this will be a directory containing multiple '
-        + 'profiles. For other browsers, this directory will be the state for '
-        + 'a single profile.',
+parser.add_argument("-m", "--measurements", {
+    choices: Object.values(MeasurementType),
+    default: Object.values(MeasurementType),
+    help: "Which measurements of performance to collect. By default, performs all " +
+        "measurements.",
 });
-parser.add_argument('-p', '--profile', {
-    help: 'For chromium runs, this is the name of the profile in an existing '
-        + '--user-data-dir directory to load. (Only used for Chromium browsers)',
-    default: 'Default',
+parser.add_argument("-d", "--user-data-dir", {
+    help: "Path to the user data directory to load and save persistent state " +
+        "to. For chromium browsers, this will be a directory containing multiple " +
+        "profiles. For other browsers, this directory will be the state for " +
+        "a single profile. If not provided, will create a new temporary " +
+        "user-data directory.",
 });
-parser.add_argument('-t', '--timeout', {
-    help: 'Number of seconds to wait for the browser to complete tasks '
-        + 'separate from loading the given page (e.g., open the browser, '
-        + 'navigate to the given URL, etc.)',
-    type: 'int',
+parser.add_argument("-p", "--profile", {
+    default: "Default",
+    help: "For chromium runs, this is the name of the profile in an existing " +
+        "--user-data-dir directory to load. (Only used for Chromium browsers)",
+});
+parser.add_argument("-t", "--timeout", {
     default: 30,
+    help: "Number of seconds to wait for the browser to complete tasks " +
+        "separate from loading the given page (e.g., open the browser, " +
+        "navigate to the given URL, etc.)",
+    type: "int",
 });
-parser.add_argument('-s', '--seconds', {
-    help: 'Number of seconds to wait while measuring page performance.',
-    type: 'int',
+parser.add_argument("-s", "--seconds", {
     default: 30,
+    help: "Number of seconds to wait while measuring page performance.",
+    type: "int",
 });
-parser.add_argument('-x', '--binary-path', {
-    help: 'Path to the browser binary to run the measurements with. Note that '
-        + 'this argument is only valid for Chromium-family browsers, since '
-        + 'Chromium family browsers do not require any playwright patches, '
-        + 'while the gecko and webkit ones do.',
+parser.add_argument("-x", "--binary-path", {
+    help: "Path to the browser binary to run the measurements with. Note that " +
+        "this argument is only valid for Chromium-family browsers, since " +
+        "Chromium family browsers do not require any playwright patches, " +
+        "while the gecko and webkit ones do.",
 });
-parser.add_argument('-u', '--url', {
-    help: 'The URL to run measurements against. Should be a full URL (i.e., '
-        + 'at least a scheme and a domain).',
+parser.add_argument("-u", "--url", {
+    help: "The URL to run measurements against. Should be a full URL (i.e., " +
+        "at least a scheme and a domain).",
+    required: true,
     type: URL,
 });
-parser.add_argument('--height', {
-    help: 'The height of the browser viewport to use when loading pages.',
-    type: 'int',
+parser.add_argument("--height", {
     default: 1024,
+    help: "The height of the browser viewport to use when loading pages.",
+    type: "int",
 });
-parser.add_argument('--width', {
-    help: 'The width of the browser viewport to use when loading pages.',
-    type: 'int',
+parser.add_argument("--width", {
     default: 1280,
+    help: "The width of the browser viewport to use when loading pages.",
+    type: "int",
 });
-parser.add_argument('--logging', {
-    help: 'What level of information to include when printing information during '
-        + 'the measurement.',
+parser.add_argument("--logging", {
     choices: Object.values(LoggingLevel),
     default: LoggingLevel.Info,
+    help: "What level of information to include when printing information during " +
+        "the measurement.",
 });
 const rawArgs = parser.parse_args();
 const runConfig = await runConfigForArgs(rawArgs);
-const { url, seconds, timeout, logLevel } = runConfig;
+const { measurements, url, seconds, timeout, logLevel } = runConfig;
 const logger = getLogger(logLevel);
 const browserContext = await launch(logger, runConfig);
-const results = await measureURL(logger, browserContext, url, seconds, timeout);
-console.log(results);
+const results = await measureURL(logger, browserContext, url, seconds, timeout, measurements);
+console.log(JSON.stringify(results));
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiY2xpLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiLi4vc3JjL2NsaS50cyJdLCJuYW1lcyI6W10sIm1hcHBpbmdzIjoiO0FBRUEsT0FBTyxFQUFFLGNBQWMsRUFBRSw2QkFBNkIsRUFBRSxNQUFNLFVBQVUsQ0FBQztBQUV6RSxPQUFPLEVBQUUsTUFBTSxFQUFFLE1BQU0sY0FBYyxDQUFDO0FBQ3RDLE9BQU8sRUFBRSxnQkFBZ0IsRUFBRSxNQUFNLGFBQWEsQ0FBQztBQUMvQyxPQUFPLEVBQUUsU0FBUyxFQUFFLFlBQVksRUFBRSxNQUFNLGNBQWMsQ0FBQztBQUN2RCxPQUFPLEVBQUUsVUFBVSxFQUFFLE1BQU0sY0FBYyxDQUFDO0FBQzFDLE9BQU8sRUFBRSxXQUFXLEVBQUUsZUFBZSxFQUFFLE1BQU0sWUFBWSxDQUFDO0FBRTFELE1BQU0sTUFBTSxHQUFHLElBQUksY0FBYyxDQUFDO0lBQ2hDLFdBQVcsRUFBRSw4REFBOEQ7SUFDM0UsZUFBZSxFQUFFLDZCQUE2QjtDQUMvQyxDQUFDLENBQUM7QUFDSCxNQUFNLENBQUMsWUFBWSxDQUFDLElBQUksRUFBRSxXQUFXLEVBQUU7SUFDckMsT0FBTyxFQUFFLE1BQU0sQ0FBQyxNQUFNLENBQUMsV0FBVyxDQUFDO0lBQ25DLE9BQU8sRUFBRSxXQUFXLENBQUMsS0FBSztJQUMxQixJQUFJLEVBQUUsNENBQTRDO0NBQ25ELENBQUMsQ0FBQztBQUNILE1BQU0sQ0FBQyxZQUFZLENBQUMsSUFBSSxFQUFFLGdCQUFnQixFQUFFO0lBQzFDLE9BQU8sRUFBRSxNQUFNLENBQUMsTUFBTSxDQUFDLGVBQWUsQ0FBQztJQUN2QyxPQUFPLEVBQUUsTUFBTSxDQUFDLE1BQU0sQ0FBQyxlQUFlLENBQUM7SUFDdkMsSUFBSSxFQUNGLHlFQUF5RTtRQUN6RSxlQUFlO0NBQ2xCLENBQUMsQ0FBQztBQUNILE1BQU0sQ0FBQyxZQUFZLENBQUMsSUFBSSxFQUFFLGlCQUFpQixFQUFFO0lBQzNDLElBQUksRUFDRixvRUFBb0U7UUFDcEUsMEVBQTBFO1FBQzFFLHFFQUFxRTtRQUNyRSxpRUFBaUU7UUFDakUsc0JBQXNCO0NBQ3pCLENBQUMsQ0FBQztBQUNILE1BQU0sQ0FBQyxZQUFZLENBQUMsSUFBSSxFQUFFLFdBQVcsRUFBRTtJQUNyQyxPQUFPLEVBQUUsU0FBUztJQUNsQixJQUFJLEVBQ0Ysb0VBQW9FO1FBQ3BFLHNFQUFzRTtDQUN6RSxDQUFDLENBQUM7QUFDSCxNQUFNLENBQUMsWUFBWSxDQUFDLElBQUksRUFBRSxXQUFXLEVBQUU7SUFDckMsT0FBTyxFQUFFLEVBQUU7SUFDWCxJQUFJLEVBQ0YsOERBQThEO1FBQzlELGdFQUFnRTtRQUNoRSxrQ0FBa0M7SUFDcEMsSUFBSSxFQUFFLEtBQUs7Q0FDWixDQUFDLENBQUM7QUFDSCxNQUFNLENBQUMsWUFBWSxDQUFDLElBQUksRUFBRSxXQUFXLEVBQUU7SUFDckMsT0FBTyxFQUFFLEVBQUU7SUFDWCxJQUFJLEVBQUUsNkRBQTZEO0lBQ25FLElBQUksRUFBRSxLQUFLO0NBQ1osQ0FBQyxDQUFDO0FBQ0gsTUFBTSxDQUFDLFlBQVksQ0FBQyxJQUFJLEVBQUUsZUFBZSxFQUFFO0lBQ3pDLElBQUksRUFDRixxRUFBcUU7UUFDckUsa0VBQWtFO1FBQ2xFLGtFQUFrRTtRQUNsRSxxQ0FBcUM7Q0FDeEMsQ0FBQyxDQUFDO0FBQ0gsTUFBTSxDQUFDLFlBQVksQ0FBQyxJQUFJLEVBQUUsT0FBTyxFQUFFO0lBQ2pDLElBQUksRUFDRixtRUFBbUU7UUFDbkUsa0NBQWtDO0lBQ3BDLFFBQVEsRUFBRSxJQUFJO0lBQ2QsSUFBSSxFQUFFLEdBQUc7Q0FDVixDQUFDLENBQUM7QUFDSCxNQUFNLENBQUMsWUFBWSxDQUFDLFVBQVUsRUFBRTtJQUM5QixPQUFPLEVBQUUsSUFBSTtJQUNiLElBQUksRUFBRSwrREFBK0Q7SUFDckUsSUFBSSxFQUFFLEtBQUs7Q0FDWixDQUFDLENBQUM7QUFDSCxNQUFNLENBQUMsWUFBWSxDQUFDLFNBQVMsRUFBRTtJQUM3QixPQUFPLEVBQUUsSUFBSTtJQUNiLElBQUksRUFBRSw4REFBOEQ7SUFDcEUsSUFBSSxFQUFFLEtBQUs7Q0FDWixDQUFDLENBQUM7QUFDSCxNQUFNLENBQUMsWUFBWSxDQUFDLFdBQVcsRUFBRTtJQUMvQixPQUFPLEVBQUUsTUFBTSxDQUFDLE1BQU0sQ0FBQyxZQUFZLENBQUM7SUFDcEMsT0FBTyxFQUFFLFlBQVksQ0FBQyxJQUFJO0lBQzFCLElBQUksRUFDRix3RUFBd0U7UUFDeEUsa0JBQWtCO0NBQ3JCLENBQUMsQ0FBQztBQUVILE1BQU0sT0FBTyxHQUFHLE1BQU0sQ0FBQyxVQUFVLEVBQUUsQ0FBQztBQUVwQyxNQUFNLFNBQVMsR0FBRyxNQUFNLGdCQUFnQixDQUFDLE9BQU8sQ0FBQyxDQUFDO0FBQ2xELE1BQU0sRUFBRSxZQUFZLEVBQUUsR0FBRyxFQUFFLE9BQU8sRUFBRSxPQUFPLEVBQUUsUUFBUSxFQUFFLEdBQUcsU0FBUyxDQUFDO0FBQ3BFLE1BQU0sTUFBTSxHQUFHLFNBQVMsQ0FBQyxRQUFRLENBQUMsQ0FBQztBQUNuQyxNQUFNLGNBQWMsR0FBRyxNQUFNLE1BQU0sQ0FBQyxNQUFNLEVBQUUsU0FBUyxDQUFDLENBQUM7QUFDdkQsTUFBTSxPQUFPLEdBQUcsTUFBTSxVQUFVLENBQzlCLE1BQU0sRUFDTixjQUFjLEVBQ2QsR0FBRyxFQUNILE9BQU8sRUFDUCxPQUFPLEVBQ1AsWUFBWSxDQUNiLENBQUM7QUFFRixPQUFPLENBQUMsR0FBRyxDQUFDLElBQUksQ0FBQyxTQUFTLENBQUMsT0FBTyxDQUFDLENBQUMsQ0FBQyIsInNvdXJjZXNDb250ZW50IjpbIiMhL3Vzci9iaW4vZW52IG5vZGVcblxuaW1wb3J0IHsgQXJndW1lbnRQYXJzZXIsIEFyZ3VtZW50RGVmYXVsdHNIZWxwRm9ybWF0dGVyIH0gZnJvbSBcImFyZ3BhcnNlXCI7XG5cbmltcG9ydCB7IGxhdW5jaCB9IGZyb20gXCIuL2Jyb3dzZXIuanNcIjtcbmltcG9ydCB7IHJ1bkNvbmZpZ0ZvckFyZ3MgfSBmcm9tIFwiLi9jb25maWcuanNcIjtcbmltcG9ydCB7IGdldExvZ2dlciwgTG9nZ2luZ0xldmVsIH0gZnJvbSBcIi4vbG9nZ2luZy5qc1wiO1xuaW1wb3J0IHsgbWVhc3VyZVVSTCB9IGZyb20gXCIuL21lYXN1cmUuanNcIjtcbmltcG9ydCB7IEJyb3dzZXJUeXBlLCBNZWFzdXJlbWVudFR5cGUgfSBmcm9tIFwiLi90eXBlcy5qc1wiO1xuXG5jb25zdCBwYXJzZXIgPSBuZXcgQXJndW1lbnRQYXJzZXIoe1xuICBkZXNjcmlwdGlvbjogXCJSdW4gcGVyZm9ybWFuY2UgdGVzdHMgZm9yIGEgcGxheXdyaWdodCB2ZXJzaW9uIG9mIGEgYnJvd3Nlci5cIixcbiAgZm9ybWF0dGVyX2NsYXNzOiBBcmd1bWVudERlZmF1bHRzSGVscEZvcm1hdHRlcixcbn0pO1xucGFyc2VyLmFkZF9hcmd1bWVudChcIi1iXCIsIFwiLS1icm93c2VyXCIsIHtcbiAgY2hvaWNlczogT2JqZWN0LnZhbHVlcyhCcm93c2VyVHlwZSksXG4gIGRlZmF1bHQ6IEJyb3dzZXJUeXBlLkJyYXZlLFxuICBoZWxwOiBcIldoaWNoIGJyb3dzZXIgZmFtaWx5IHRvIHVzZSBmb3IgdGhpcyB0ZXN0LlwiLFxufSk7XG5wYXJzZXIuYWRkX2FyZ3VtZW50KFwiLW1cIiwgXCItLW1lYXN1cmVtZW50c1wiLCB7XG4gIGNob2ljZXM6IE9iamVjdC52YWx1ZXMoTWVhc3VyZW1lbnRUeXBlKSxcbiAgZGVmYXVsdDogT2JqZWN0LnZhbHVlcyhNZWFzdXJlbWVudFR5cGUpLFxuICBoZWxwOlxuICAgIFwiV2hpY2ggbWVhc3VyZW1lbnRzIG9mIHBlcmZvcm1hbmNlIHRvIGNvbGxlY3QuIEJ5IGRlZmF1bHQsIHBlcmZvcm1zIGFsbCBcIiArXG4gICAgXCJtZWFzdXJlbWVudHMuXCIsXG59KTtcbnBhcnNlci5hZGRfYXJndW1lbnQoXCItZFwiLCBcIi0tdXNlci1kYXRhLWRpclwiLCB7XG4gIGhlbHA6XG4gICAgXCJQYXRoIHRvIHRoZSB1c2VyIGRhdGEgZGlyZWN0b3J5IHRvIGxvYWQgYW5kIHNhdmUgcGVyc2lzdGVudCBzdGF0ZSBcIiArXG4gICAgXCJ0by4gRm9yIGNocm9taXVtIGJyb3dzZXJzLCB0aGlzIHdpbGwgYmUgYSBkaXJlY3RvcnkgY29udGFpbmluZyBtdWx0aXBsZSBcIiArXG4gICAgXCJwcm9maWxlcy4gRm9yIG90aGVyIGJyb3dzZXJzLCB0aGlzIGRpcmVjdG9yeSB3aWxsIGJlIHRoZSBzdGF0ZSBmb3IgXCIgK1xuICAgIFwiYSBzaW5nbGUgcHJvZmlsZS4gSWYgbm90IHByb3ZpZGVkLCB3aWxsIGNyZWF0ZSBhIG5ldyB0ZW1wb3JhcnkgXCIgK1xuICAgIFwidXNlci1kYXRhIGRpcmVjdG9yeS5cIixcbn0pO1xucGFyc2VyLmFkZF9hcmd1bWVudChcIi1wXCIsIFwiLS1wcm9maWxlXCIsIHtcbiAgZGVmYXVsdDogXCJEZWZhdWx0XCIsXG4gIGhlbHA6XG4gICAgXCJGb3IgY2hyb21pdW0gcnVucywgdGhpcyBpcyB0aGUgbmFtZSBvZiB0aGUgcHJvZmlsZSBpbiBhbiBleGlzdGluZyBcIiArXG4gICAgXCItLXVzZXItZGF0YS1kaXIgZGlyZWN0b3J5IHRvIGxvYWQuIChPbmx5IHVzZWQgZm9yIENocm9taXVtIGJyb3dzZXJzKVwiLFxufSk7XG5wYXJzZXIuYWRkX2FyZ3VtZW50KFwiLXRcIiwgXCItLXRpbWVvdXRcIiwge1xuICBkZWZhdWx0OiAzMCxcbiAgaGVscDpcbiAgICBcIk51bWJlciBvZiBzZWNvbmRzIHRvIHdhaXQgZm9yIHRoZSBicm93c2VyIHRvIGNvbXBsZXRlIHRhc2tzIFwiICtcbiAgICBcInNlcGFyYXRlIGZyb20gbG9hZGluZyB0aGUgZ2l2ZW4gcGFnZSAoZS5nLiwgb3BlbiB0aGUgYnJvd3NlciwgXCIgK1xuICAgIFwibmF2aWdhdGUgdG8gdGhlIGdpdmVuIFVSTCwgZXRjLilcIixcbiAgdHlwZTogXCJpbnRcIixcbn0pO1xucGFyc2VyLmFkZF9hcmd1bWVudChcIi1zXCIsIFwiLS1zZWNvbmRzXCIsIHtcbiAgZGVmYXVsdDogMzAsXG4gIGhlbHA6IFwiTnVtYmVyIG9mIHNlY29uZHMgdG8gd2FpdCB3aGlsZSBtZWFzdXJpbmcgcGFnZSBwZXJmb3JtYW5jZS5cIixcbiAgdHlwZTogXCJpbnRcIixcbn0pO1xucGFyc2VyLmFkZF9hcmd1bWVudChcIi14XCIsIFwiLS1iaW5hcnktcGF0aFwiLCB7XG4gIGhlbHA6XG4gICAgXCJQYXRoIHRvIHRoZSBicm93c2VyIGJpbmFyeSB0byBydW4gdGhlIG1lYXN1cmVtZW50cyB3aXRoLiBOb3RlIHRoYXQgXCIgK1xuICAgIFwidGhpcyBhcmd1bWVudCBpcyBvbmx5IHZhbGlkIGZvciBDaHJvbWl1bS1mYW1pbHkgYnJvd3NlcnMsIHNpbmNlIFwiICtcbiAgICBcIkNocm9taXVtIGZhbWlseSBicm93c2VycyBkbyBub3QgcmVxdWlyZSBhbnkgcGxheXdyaWdodCBwYXRjaGVzLCBcIiArXG4gICAgXCJ3aGlsZSB0aGUgZ2Vja28gYW5kIHdlYmtpdCBvbmVzIGRvLlwiLFxufSk7XG5wYXJzZXIuYWRkX2FyZ3VtZW50KFwiLXVcIiwgXCItLXVybFwiLCB7XG4gIGhlbHA6XG4gICAgXCJUaGUgVVJMIHRvIHJ1biBtZWFzdXJlbWVudHMgYWdhaW5zdC4gU2hvdWxkIGJlIGEgZnVsbCBVUkwgKGkuZS4sIFwiICtcbiAgICBcImF0IGxlYXN0IGEgc2NoZW1lIGFuZCBhIGRvbWFpbikuXCIsXG4gIHJlcXVpcmVkOiB0cnVlLFxuICB0eXBlOiBVUkwsXG59KTtcbnBhcnNlci5hZGRfYXJndW1lbnQoXCItLWhlaWdodFwiLCB7XG4gIGRlZmF1bHQ6IDEwMjQsXG4gIGhlbHA6IFwiVGhlIGhlaWdodCBvZiB0aGUgYnJvd3NlciB2aWV3cG9ydCB0byB1c2Ugd2hlbiBsb2FkaW5nIHBhZ2VzLlwiLFxuICB0eXBlOiBcImludFwiLFxufSk7XG5wYXJzZXIuYWRkX2FyZ3VtZW50KFwiLS13aWR0aFwiLCB7XG4gIGRlZmF1bHQ6IDEyODAsXG4gIGhlbHA6IFwiVGhlIHdpZHRoIG9mIHRoZSBicm93c2VyIHZpZXdwb3J0IHRvIHVzZSB3aGVuIGxvYWRpbmcgcGFnZXMuXCIsXG4gIHR5cGU6IFwiaW50XCIsXG59KTtcbnBhcnNlci5hZGRfYXJndW1lbnQoXCItLWxvZ2dpbmdcIiwge1xuICBjaG9pY2VzOiBPYmplY3QudmFsdWVzKExvZ2dpbmdMZXZlbCksXG4gIGRlZmF1bHQ6IExvZ2dpbmdMZXZlbC5JbmZvLFxuICBoZWxwOlxuICAgIFwiV2hhdCBsZXZlbCBvZiBpbmZvcm1hdGlvbiB0byBpbmNsdWRlIHdoZW4gcHJpbnRpbmcgaW5mb3JtYXRpb24gZHVyaW5nIFwiICtcbiAgICBcInRoZSBtZWFzdXJlbWVudC5cIixcbn0pO1xuXG5jb25zdCByYXdBcmdzID0gcGFyc2VyLnBhcnNlX2FyZ3MoKTtcblxuY29uc3QgcnVuQ29uZmlnID0gYXdhaXQgcnVuQ29uZmlnRm9yQXJncyhyYXdBcmdzKTtcbmNvbnN0IHsgbWVhc3VyZW1lbnRzLCB1cmwsIHNlY29uZHMsIHRpbWVvdXQsIGxvZ0xldmVsIH0gPSBydW5Db25maWc7XG5jb25zdCBsb2dnZXIgPSBnZXRMb2dnZXIobG9nTGV2ZWwpO1xuY29uc3QgYnJvd3NlckNvbnRleHQgPSBhd2FpdCBsYXVuY2gobG9nZ2VyLCBydW5Db25maWcpO1xuY29uc3QgcmVzdWx0cyA9IGF3YWl0IG1lYXN1cmVVUkwoXG4gIGxvZ2dlcixcbiAgYnJvd3NlckNvbnRleHQsXG4gIHVybCxcbiAgc2Vjb25kcyxcbiAgdGltZW91dCxcbiAgbWVhc3VyZW1lbnRzLFxuKTtcblxuY29uc29sZS5sb2coSlNPTi5zdHJpbmdpZnkocmVzdWx0cykpO1xuIl19

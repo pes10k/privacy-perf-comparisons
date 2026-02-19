@@ -1,95 +1,70 @@
-import assert from 'node:assert/strict'
+import assert from "node:assert/strict";
 
-import { BrowserContext } from 'playwright'
-import { Frame, Page, Request, Response, WebSocket } from 'playwright'
+import { BrowserContext } from "@playwright/test";
 
-import { Logger } from './logging.js'
-import { PageMeasurements, FrameMeasurements } from './measurements/network.js'
-import { injected_GetPageMeasurements } from './measurements/timing.js'
-import { Serializable } from './types.js'
+import { Logger } from "./logging.js";
+import { BaseMeasurer, MeasurementResult } from "./measurements/base.js";
+import { NetworkMeasurer } from "./measurements/network.js";
+import { TimingMeasurer } from "./measurements/timing.js";
+import { MeasurementType, Report } from "./types.js";
 
-interface Measurements {
-  timing: Serializable,
-  network: Serializable,
-}
+const measurerTypeToClassMap: Record<MeasurementType, typeof BaseMeasurer> = {
+  [MeasurementType.Network]: NetworkMeasurer,
+  [MeasurementType.Timing]: TimingMeasurer,
+};
 
-const instrumentNewPageContent = (measurements: FrameMeasurements,
-                                  logger: Logger,
-                                  page: Page) => {
-  page.on('websocket', (webSocket: WebSocket) => {
-    const wsUrl = webSocket.url()
-    webSocket.on('framesent', (data) => {
-      const datapoint = measurements.addWebSocketRequest(wsUrl, data.payload)
-      logger.verbose('Network (Sent) : ', datapoint)
-    })
+export const measureURL = async (
+  logger: Logger,
+  context: BrowserContext,
+  url: URL,
+  seconds: number,
+  timeout: number,
+  measurements: MeasurementType[],
+): Promise<Report> => {
+  // Create and instantiate any measurement classes that were requested
+  const measurers = new Map<MeasurementType, BaseMeasurer>();
+  for (const aMeasurementType of measurements) {
+    const aMeasurerType = measurerTypeToClassMap[aMeasurementType];
+    const aMeasurer = new aMeasurerType(logger, url, context);
+    measurers.set(aMeasurementType, aMeasurer);
+  }
 
-    webSocket.on('framereceived', (data) => {
-      const datapoint = measurements.addWebSocketRequest(wsUrl, data.payload)
-      logger.verbose('Network (Received) : ', datapoint)
-    })
-  })
-
-  page.on('request', (request: Request) => {
-    const datapoint = measurements.addRequest(request)
-    logger.verbose('Network (Sent) : ', datapoint)
-  })
-
-  page.on('response', (response: Response) => {
-    const datapoint = measurements.addResponse(response)
-    logger.verbose('Network (Received) : ', datapoint)
-  })
-}
-
-const instrumentContext = (logger: Logger,
-                           context: BrowserContext): PageMeasurements => {
-  const measurements = new PageMeasurements(logger)
-  context.on('page', (page: Page) => {
-    page.on('framenavigated', (frame: Frame) => {
-      // If any frame other than the top level frame is navigating,
-      // we don't care about it (since requests and other behaviors
-      // from the child frames will be captured by the corresponding
-      // top level frame).
-      if (page.mainFrame() !== frame) {
-        return
-      }
-      const pageMeasurements = measurements.measurementsForNewTopFrame(page)
-      if (pageMeasurements) {
-        instrumentNewPageContent(pageMeasurements, logger, page)
-      }
-    })
-  })
-
-  return measurements
-}
-
-export const measureURL = async (logger: Logger,
-                                 context: BrowserContext,
-                                 url: URL,
-                                 seconds: number,
-                                 timeout: number): Promise<Measurements> => {
-  const netMeasurements = instrumentContext(logger, context)
-  netMeasurements.setDescription(url.toString())
-  const page = await context.newPage()
-
-  logger.info(`Navigating to url="${page.url()}"`)
+  const page = await context.newPage();
+  const startTime = new Date();
+  logger.info(`Navigating to url="${page.url()}"`);
   const navRequest = await page.goto(url.toString(), {
     timeout: timeout * 1000,
-    waitUntil: 'commit',
-  })
-  assert(navRequest)
+    waitUntil: "commit",
+  });
+  assert(navRequest);
 
-  logger.info(`Arrived at url="${page.url()}"`)
-  netMeasurements.addPageNavigation(page, navRequest)
-
-  logger.info(`Letting page load for "${seconds}" seconds`)
-  page.waitForTimeout(seconds * 1000)
-  netMeasurements.close()
-
-  logger.info('Fetching timing measurements')
-  const timingMeasurements = await page.evaluate(injected_GetPageMeasurements)
-
-  return {
-    network: netMeasurements.toJSON(),
-    timing: timingMeasurements,
+  logger.info(`Arrived at url="${page.url()}"`);
+  const netMeasurer = measurers.get(MeasurementType.Network);
+  if (netMeasurer) {
+    await (netMeasurer as NetworkMeasurer).addInitNavigationResponse(
+      page,
+      navRequest,
+    );
   }
-}
+
+  logger.info(`Letting page load for "${String(seconds)}" seconds`);
+  await page.waitForTimeout(seconds * 1000);
+
+  for (const aMeasurer of measurers.values()) {
+    aMeasurer.close();
+  }
+  await page.waitForTimeout(5 * 1000);
+
+  const results = {} as Record<MeasurementType, MeasurementResult | null>;
+  for (const [aMeasurementType, aMeasurer] of measurers.entries()) {
+    results[aMeasurementType] = await aMeasurer.collect();
+  }
+
+  await context.close();
+  return {
+    end: new Date(),
+    measurements: results,
+    start: startTime,
+    url: url,
+  };
+};
