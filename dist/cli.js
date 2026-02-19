@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { ArgumentParser, ArgumentDefaultsHelpFormatter } from 'argparse';
-import { BrowserType, LoggingLevel } from './types.js';
+import { launch } from './browser.js';
 import { runConfigForArgs } from './config.js';
+import { getLogger } from './logging.js';
+import { measureURL } from './measure.js';
+import { BrowserType, LoggingLevel } from './types.js';
 const parser = new ArgumentParser({
     description: 'Run performance tests for a playwright version of a browser.',
     formatter_class: ArgumentDefaultsHelpFormatter,
@@ -62,5 +65,9 @@ parser.add_argument('--logging', {
     default: LoggingLevel.Info,
 });
 const rawArgs = parser.parse_args();
-const runConfig = runConfigForArgs(rawArgs);
-console.log(runConfig);
+const runConfig = await runConfigForArgs(rawArgs);
+const { url, seconds, timeout, logLevel } = runConfig;
+const logger = getLogger(logLevel);
+const browserContext = await launch(logger, runConfig);
+const results = await measureURL(logger, browserContext, url, seconds, timeout);
+console.log(results);
