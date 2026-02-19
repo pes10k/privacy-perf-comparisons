@@ -5,12 +5,14 @@
   "license": "ISC",
   "author": "Peter Snyder <pes@brave.com>",
   "type": "module",
-  "main": "out/run.js",
+  "main": "dist/cli.js",
   "scripts": {
     "build": "npx tsc",
-    "clean": "rm -Rf out/*",
-    "lint": "npx eslint src/*.ts",
-    "lint:fix": "npx eslint --fix src/**/*.ts src/*.ts"
+    "clean": "rm -Rf ./dist/*",
+    "install-browsers": "npx playwright install",
+    "lint": "npx eslint ./src/**/*.ts",
+    "lint:fix": "npx eslint --fix ./src/**/*.ts",
+    "start": "node ./dist/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
