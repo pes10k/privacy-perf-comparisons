@@ -4,7 +4,5 @@
         "target": "es2024",
         "outDir": "dist"
     },
-    "include": [
-        "src/*.ts"
-, "src/measurements/network.ts"    ]
+    "include": ["src/**/*.ts"]
 }

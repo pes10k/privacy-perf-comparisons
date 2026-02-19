@@ -1,3 +1,6 @@
+Run with `npm run start`.
+
+Below is the output of `npm run start -- --help`.
 
 > privacy-perf-comparisons@0.0.1 start
 > node ./dist/cli.js --help

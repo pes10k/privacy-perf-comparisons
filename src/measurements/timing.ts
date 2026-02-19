@@ -12,7 +12,7 @@ export const injected_GetPageMeasurements = (): Serializable => {
       const entries = list.getEntries()
       const lastLCPEntry = entries[entries.length - 1]
       resolve({
-        navigation: navEntries.toJSON,
+        navigation: navEntries.toJSON(),
         lcp: lastLCPEntry.toJSON(),
       })
     })

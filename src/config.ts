@@ -7,7 +7,6 @@ import { chromium, firefox, webkit } from 'playwright'
 
 import { BrowserType, Path, RunConfig } from './types.js'
 
-// This is the same default as playwright
 const programName = 'privacy-perf-comparisons'
 const validSchemes = [
   'http',

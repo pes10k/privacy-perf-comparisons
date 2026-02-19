@@ -3,7 +3,6 @@ import { access, constants, mkdtempDisposable } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, firefox, webkit } from 'playwright';
 import { BrowserType } from './types.js';
-// This is the same default as playwright
 const programName = 'privacy-perf-comparisons';
 const validSchemes = [
     'http',
