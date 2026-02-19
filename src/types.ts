@@ -15,6 +15,8 @@ export type Path = string
 export type WSFrame = string | Buffer
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LaunchArgs = any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Serializable = any
 
 export interface RunConfig {
   binary: Path

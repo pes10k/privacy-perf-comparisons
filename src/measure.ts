@@ -4,7 +4,14 @@ import { BrowserContext } from 'playwright'
 import { Frame, Page, Request, Response, WebSocket } from 'playwright'
 
 import { Logger } from './logging.js'
-import { Measurements, FrameMeasurements } from './measurements.js'
+import { PageMeasurements, FrameMeasurements } from './measurements/network.js'
+import { injected_GetPageMeasurements } from './measurements/timing.js'
+import { Serializable } from './types.js'
+
+interface Measurements {
+  timing: Serializable,
+  network: Serializable,
+}
 
 const instrumentNewPageContent = (measurements: FrameMeasurements,
                                   logger: Logger,
@@ -34,8 +41,8 @@ const instrumentNewPageContent = (measurements: FrameMeasurements,
 }
 
 const instrumentContext = (logger: Logger,
-                           context: BrowserContext): Measurements => {
-  const measurements = new Measurements(logger)
+                           context: BrowserContext): PageMeasurements => {
+  const measurements = new PageMeasurements(logger)
   context.on('page', (page: Page) => {
     page.on('framenavigated', (frame: Frame) => {
       // If any frame other than the top level frame is navigating,
@@ -46,7 +53,9 @@ const instrumentContext = (logger: Logger,
         return
       }
       const pageMeasurements = measurements.measurementsForNewTopFrame(page)
-      instrumentNewPageContent(pageMeasurements, logger, page)
+      if (pageMeasurements) {
+        instrumentNewPageContent(pageMeasurements, logger, page)
+      }
     })
   })
 
@@ -58,7 +67,8 @@ export const measureURL = async (logger: Logger,
                                  url: URL,
                                  seconds: number,
                                  timeout: number): Promise<Measurements> => {
-  const measurements = instrumentContext(logger, context)
+  const netMeasurements = instrumentContext(logger, context)
+  netMeasurements.setDescription(url.toString())
   const page = await context.newPage()
 
   logger.info(`Navigating to url="${page.url()}"`)
@@ -69,10 +79,17 @@ export const measureURL = async (logger: Logger,
   assert(navRequest)
 
   logger.info(`Arrived at url="${page.url()}"`)
-  measurements.addPageNavigation(page, navRequest)
+  netMeasurements.addPageNavigation(page, navRequest)
 
   logger.info(`Letting page load for "${seconds}" seconds`)
   page.waitForTimeout(seconds * 1000)
+  netMeasurements.close()
 
-  return measurements
+  logger.info('Fetching timing measurements')
+  const timingMeasurements = await page.evaluate(injected_GetPageMeasurements)
+
+  return {
+    network: netMeasurements.toJSON(),
+    timing: timingMeasurements,
+  }
 }

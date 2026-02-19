@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { Measurements } from './measurements.js';
+import { PageMeasurements } from './measurements/network.js';
+import { injected_GetPageMeasurements } from './measurements/timing.js';
 const instrumentNewPageContent = (measurements, logger, page) => {
     page.on('websocket', (webSocket) => {
         const wsUrl = webSocket.url();
@@ -22,7 +23,7 @@ const instrumentNewPageContent = (measurements, logger, page) => {
     });
 };
 const instrumentContext = (logger, context) => {
-    const measurements = new Measurements(logger);
+    const measurements = new PageMeasurements(logger);
     context.on('page', (page) => {
         page.on('framenavigated', (frame) => {
             // If any frame other than the top level frame is navigating,
@@ -33,13 +34,16 @@ const instrumentContext = (logger, context) => {
                 return;
             }
             const pageMeasurements = measurements.measurementsForNewTopFrame(page);
-            instrumentNewPageContent(pageMeasurements, logger, page);
+            if (pageMeasurements) {
+                instrumentNewPageContent(pageMeasurements, logger, page);
+            }
         });
     });
     return measurements;
 };
 export const measureURL = async (logger, context, url, seconds, timeout) => {
-    const measurements = instrumentContext(logger, context);
+    const netMeasurements = instrumentContext(logger, context);
+    netMeasurements.setDescription(url.toString());
     const page = await context.newPage();
     logger.info(`Navigating to url="${page.url()}"`);
     const navRequest = await page.goto(url.toString(), {
@@ -48,8 +52,14 @@ export const measureURL = async (logger, context, url, seconds, timeout) => {
     });
     assert(navRequest);
     logger.info(`Arrived at url="${page.url()}"`);
-    measurements.addPageNavigation(page, navRequest);
+    netMeasurements.addPageNavigation(page, navRequest);
     logger.info(`Letting page load for "${seconds}" seconds`);
     page.waitForTimeout(seconds * 1000);
-    return measurements;
+    netMeasurements.close();
+    logger.info('Fetching timing measurements');
+    const timingMeasurements = await page.evaluate(injected_GetPageMeasurements);
+    return {
+        network: netMeasurements.toJSON(),
+        timing: timingMeasurements,
+    };
 };
