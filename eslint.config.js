@@ -15,5 +15,12 @@ export default defineConfig(
       },
     },
   },
+  {
+    rules: {
+      "@typescript-eslint/unbound-method": ["error", {
+        "ignoreStatic": true,
+      }],
+    },
+  },
   eslintPluginPrettierRecommended,
 );

@@ -3,8 +3,9 @@
     "compilerOptions": {
         "target": "es2024",
         "outDir": "dist",
-        "inlineSourceMap": true,
-        "inlineSources": true
+        "sourceMap": true
+        // "inlineSourceMap": true,
+        // "inlineSources": true
     },
     "include": ["src/**/*.ts"]
 }

@@ -1,7 +1,7 @@
 {
-  "name": "privacy-perf-comparisons",
+  "name": "browser-perf",
   "version": "0.0.1",
-  "description": "Automated comparisons of browser performance.",
+  "description": "Automated, cross-browser measurements of performance.",
   "license": "ISC",
   "author": "Peter Snyder <pes@brave.com>",
   "type": "module",
@@ -13,6 +13,9 @@
     "lint": "npx eslint -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
     "lint:fix": "npx eslint --fix -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
     "start": "NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
+  },
+  "bin": {
+    "browser-perf": "dist/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

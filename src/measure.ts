@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import { BrowserContext } from "@playwright/test";
 
 import { Logger } from "./logging.js";
-import { BaseMeasurer, MeasurementResult } from "./measurements/base.js";
+import {
+  BaseMeasurer,
+  MeasurementResult,
+  BaseMeasurerChild,
+} from "./measurements/base.js";
 import { NetworkMeasurer } from "./measurements/network.js";
 import { TimingMeasurer } from "./measurements/timing.js";
 import { MeasurementType, Report } from "./types.js";
 
-const measurerTypeToClassMap: Record<MeasurementType, typeof BaseMeasurer> = {
+const measurerTypeToClassMap: Record<MeasurementType, BaseMeasurerChild> = {
   [MeasurementType.Network]: NetworkMeasurer,
   [MeasurementType.Timing]: TimingMeasurer,
 };
@@ -26,6 +30,7 @@ export const measureURL = async (
   for (const aMeasurementType of measurements) {
     const aMeasurerType = measurerTypeToClassMap[aMeasurementType];
     const aMeasurer = new aMeasurerType(logger, url, context);
+    aMeasurer.instrumentContext();
     measurers.set(aMeasurementType, aMeasurer);
   }
 
@@ -39,14 +44,6 @@ export const measureURL = async (
   assert(navRequest);
 
   logger.info(`Arrived at url="${page.url()}"`);
-  const netMeasurer = measurers.get(MeasurementType.Network);
-  if (netMeasurer) {
-    await (netMeasurer as NetworkMeasurer).addInitNavigationResponse(
-      page,
-      navRequest,
-    );
-  }
-
   logger.info(`Letting page load for "${String(seconds)}" seconds`);
   await page.waitForTimeout(seconds * 1000);
 

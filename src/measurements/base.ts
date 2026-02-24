@@ -8,7 +8,19 @@ export interface MeasurementResult {
   data: unknown;
 }
 
-export class BaseMeasurer {
+export type BaseMeasurerChild = new (
+  logger: Logger,
+  url: URL,
+  context: BrowserContext,
+) => BaseMeasurer;
+
+export type AttachMeasurerFunc = (
+  logger: Logger,
+  url: URL,
+  context: BrowserContext,
+) => BaseMeasurer;
+
+export abstract class BaseMeasurer {
   readonly logger: Logger;
   readonly url: URL;
   readonly context: BrowserContext;
@@ -21,7 +33,6 @@ export class BaseMeasurer {
     this.logger = logger;
     this.url = url;
     this.context = context;
-    this.instrument();
   }
 
   logInfo(...msg: unknown[]) {
@@ -46,11 +57,10 @@ export class BaseMeasurer {
     );
   }
 
-  measurementType(): MeasurementType {
-    throw new Error("Method not implemented");
-  }
+  abstract measurementType(): MeasurementType;
+  abstract collect(): Promise<MeasurementResult | null>;
 
-  instrument() {
+  instrumentContext() {
     this.context.on("close", () => {
       this.isContextClosed = true;
     });
@@ -83,10 +93,5 @@ export class BaseMeasurer {
     this.closedAt = new Date();
     this.logVerbose("Ending measurement at ", this.closedAt.toISOString());
     return true;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async collect(): Promise<MeasurementResult | null> {
-    throw new Error("Method not implemented");
   }
 }

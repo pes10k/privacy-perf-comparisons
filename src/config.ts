@@ -54,7 +54,8 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     args.browser === BrowserType.Chromium || args.browser === BrowserType.Brave;
 
   assert(typeof args.profile === "string");
-  assert(typeof args.userDataDir === "string");
+  const userDataDir = args.userDataDir as undefined | string;
+  assert(userDataDir === undefined || userDataDir === "string");
   if (args.profile && !isChromium) {
     throw new Error(
       "Invalid profile. Only Chromium browsers support " +
@@ -82,14 +83,21 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
 
   // This is not the most concise way to check these cases, but meant
   // to be the easiest to follow, by matching the above exact criteria
-  const isUserDataDirExisting = await isDirReadable(args.userDataDir);
+  let isUserDataDirExisting: boolean | undefined;
+  let isProfileReadable: boolean | undefined;
+  if (!userDataDir) {
+    isUserDataDirExisting = false;
+    isProfileReadable = false;
+  } else if (await isDirReadable(userDataDir)) {
+    isUserDataDirExisting = true;
+    isProfileReadable = await isDirReadable(userDataDir, args.profile);
+  }
 
-  const isCaseOne = !args.userDataDir;
-  const isCaseTwo = !isCaseOne && args.userDataDir && !isUserDataDirExisting;
+  const isCaseOne = !userDataDir;
+  const isCaseTwo = !isCaseOne && !isUserDataDirExisting;
   const isCaseThree =
     !isCaseOne && !isCaseTwo && !isChromium && isUserDataDirExisting;
 
-  const isProfileReadable = await isDirReadable(args.userDataDir, args.profile);
   const isCaseFour =
     !isCaseOne &&
     !isCaseTwo &&
@@ -103,9 +111,9 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     const tempDirPath = await mkdtempDisposable(join(tmpdir(), programName));
     validatedUserDataDir = tempDirPath.path;
   } else if (isCaseTwo || isCaseThree) {
-    validatedUserDataDir = args.userDataDir;
+    validatedUserDataDir = userDataDir;
   } else if (isCaseFour) {
-    validatedUserDataDir = join(args.userDataDir, args.profile);
+    validatedUserDataDir = join(userDataDir, args.profile);
     validatedProfile = args.profile;
   } else {
     throw new Error(
@@ -175,14 +183,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     );
   }
 
-  assert(typeof args.height === "string");
-  const viewportHeight = parseInt(args.height, 10);
-  assert.notDeepStrictEqual(viewportHeight, NaN);
-
-  assert(typeof args.width === "string");
-  const viewportWidth = parseInt(args.width, 10);
-  assert.notDeepStrictEqual(viewportWidth, NaN);
-
+  assert(typeof args.timeout === "number");
   if (args.timeout <= 0) {
     throw new Error("The --timeout argument must be a positive number.");
   } else if (args.timeout > 500) {
@@ -191,22 +192,22 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
         "seconds, not milliseconds.",
     );
   }
-  assert(typeof args.timeout === "string");
-  const timeoutSeconds = parseInt(args.timeout, 10);
-  assert.notDeepStrictEqual(timeoutSeconds, NaN);
 
-  assert(args.browser in BrowserType);
   const browserType = args.browser as BrowserType;
+  assert(Object.values(BrowserType).includes(browserType));
 
-  assert(args.logging in LoggingLevel);
   const loggingLevel = args.logging as LoggingLevel;
+  assert(Object.values(LoggingLevel).includes(loggingLevel));
 
   const measurementTypes: MeasurementType[] = [];
-  for (const aMeasurementType of args.measurements) {
-    assert(aMeasurementType in MeasurementType);
-    measurementTypes.push(aMeasurementType as MeasurementType);
+  for (const aMeasurementTypeRaw of args.measurements) {
+    const measurementType = aMeasurementTypeRaw as MeasurementType;
+    assert(Object.values(MeasurementType).includes(measurementType));
+    measurementTypes.push(measurementType);
   }
 
+  assert(typeof args.height === "number");
+  assert(typeof args.width === "number");
   assert(typeof args.seconds === "number");
 
   return {
@@ -216,12 +217,12 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     measurements: measurementTypes,
     profile: validatedProfile,
     seconds: args.seconds,
-    timeout: timeoutSeconds,
+    timeout: args.timeout,
     url: args.url,
     userDataDir: validatedUserDataDir,
     viewport: {
-      height: viewportHeight,
-      width: viewportWidth,
+      height: args.height,
+      width: args.width,
     },
   };
 };

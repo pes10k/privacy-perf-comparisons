@@ -211,7 +211,7 @@ class ContextNetworkLogger {
   // Notes that the top level frame in the page has navigated, and so
   // any future requests that happen on the page are happening on a different
   // top level document.
-  notePageNavigation(page: Page): PageNetworkLogger | null {
+  notePage(page: Page): PageNetworkLogger | null {
     if (this.isClosed()) {
       this.#logger.error(
         "trying to add measurements for new top frame " +
@@ -269,43 +269,43 @@ export class NetworkMeasurer extends BaseMeasurer {
     return MeasurementType.Network;
   }
 
-  instrument() {
-    super.instrument();
-    this.context.on("page", (page: Page) => {
-      page.on("websocket", (webSocket: WebSocket) => {
-        const wsUrl = webSocket.url();
-        webSocket.on("framesent", (data: { payload: WSFrame }) => {
-          this.#netLogger.addWSRequest(page, wsUrl, data.payload);
-        });
-
-        webSocket.on("framereceived", (data: { payload: WSFrame }) => {
-          this.#netLogger.addWSResponse(page, wsUrl, data.payload);
-        });
+  #instrumentPage(page: Page) {
+    this.#netLogger.notePage(page);
+    page.on("websocket", (webSocket: WebSocket) => {
+      const wsUrl = webSocket.url();
+      webSocket.on("framesent", (data: { payload: WSFrame }) => {
+        this.#netLogger.addWSRequest(page, wsUrl, data.payload);
       });
 
-      page.on("request", async (request: Request) => {
-        return await this.#netLogger.addRequest(page, request);
+      webSocket.on("framereceived", (data: { payload: WSFrame }) => {
+        this.#netLogger.addWSResponse(page, wsUrl, data.payload);
       });
+    });
 
-      page.on("response", async (response: Response) => {
-        return await this.#netLogger.addResponse(page, response);
-      });
+    page.on("request", async (request: Request) => {
+      return await this.#netLogger.addRequest(page, request);
+    });
 
-      page.on("framenavigated", (frame: Frame) => {
-        // If any frame other than the top level frame is navigating,
-        // we don't care about it (since requests and other behaviors
-        // from the child frames will be captured by the corresponding
-        // top level frame).
-        if (page.mainFrame() !== frame) {
-          return;
-        }
-        this.#netLogger.notePageNavigation(page);
-      });
+    page.on("response", async (response: Response) => {
+      return await this.#netLogger.addResponse(page, response);
+    });
+
+    page.on("framenavigated", (frame: Frame) => {
+      // If any frame other than the top level frame is navigating,
+      // we don't care about it (since requests and other behaviors
+      // from the child frames will be captured by the corresponding
+      // top level frame).
+      if (page.mainFrame() !== frame) {
+        return;
+      }
     });
   }
 
-  async addInitNavigationResponse(page: Page, response: Response) {
-    await this.#netLogger.addAutomationPageNavigation(page, response);
+  instrumentContext() {
+    super.instrumentContext();
+    this.context.on("page", (page: Page) => {
+      this.#instrumentPage(page);
+    });
   }
 
   // Disabling the linter here because this method is async, so that
