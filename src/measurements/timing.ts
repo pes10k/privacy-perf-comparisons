@@ -1,11 +1,7 @@
 import { BaseMeasurer, MeasurementResult } from "./base.js";
 import { MeasurementType, Serializable } from "../types.js";
 
-// Breaking the eslint rules to make it very-extra-explicit that this code
-// is run in page scope, and not playwright / node scope.
-//
-
-const injected_getPageMeasurements = (): Serializable => {
+const injected_getPageMeasurements = (): Promise<Serializable> => {
   return new Promise((resolve) => {
     const navEntries = window.performance.getEntriesByType("navigation")[0];
 
@@ -13,8 +9,8 @@ const injected_getPageMeasurements = (): Serializable => {
       const entries = list.getEntries();
       const lastLCPEntry = entries[entries.length - 1];
       resolve({
-        navigation: navEntries.toJSON(),
-        lcp: lastLCPEntry.toJSON(),
+        navigation: navEntries.toJSON() as unknown,
+        lcp: lastLCPEntry.toJSON() as unknown,
       });
     });
 
@@ -45,9 +41,10 @@ export class TimingMeasurer extends BaseMeasurer {
       }
 
       this.logInfo("fetching timing information for page url=", pageURL);
+      const pageResponse = await aPage.evaluate(injected_getPageMeasurements);
       const timingData = {
         url: pageURL,
-        data: await aPage.evaluate(injected_getPageMeasurements),
+        data: pageResponse,
       };
       timingMeasurements.push(timingData);
     }

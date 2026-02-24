@@ -1,11 +1,18 @@
+import { LaunchOptions } from "playwright";
+
 import { LoggingLevel } from "./logging.js";
 
 export type Path = string;
 export type WSFrame = string | Buffer;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LaunchArgs = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Serializable = any;
+export type Serializable = unknown;
+
+export interface PersistentLaunchOptions extends LaunchOptions {
+  serviceWorkers?: "allow" | "block";
+  screen?: {
+    height: number;
+    width: number;
+  };
+}
 
 export enum BrowserType {
   Brave = "brave",
@@ -29,7 +36,7 @@ export interface Report {
 export interface RunConfig {
   binary: Path;
   browser: BrowserType;
-  logLevel: LoggingLevel;
+  loggingLevel: LoggingLevel;
   measurements: MeasurementType[];
   profile?: string;
   seconds: number;

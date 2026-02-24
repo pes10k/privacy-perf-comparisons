@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { Namespace } from "argparse";
 import { chromium, firefox, webkit } from "playwright";
 
-import { BrowserType, Path, RunConfig } from "./types.js";
+import { BrowserType, MeasurementType, Path, RunConfig } from "./types.js";
+import { LoggingLevel } from "./logging.js";
 
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
@@ -52,6 +53,8 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   const isChromium =
     args.browser === BrowserType.Chromium || args.browser === BrowserType.Brave;
 
+  assert(typeof args.profile === "string");
+  assert(typeof args.userDataDir === "string");
   if (args.profile && !isChromium) {
     throw new Error(
       "Invalid profile. Only Chromium browsers support " +
@@ -85,13 +88,15 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   const isCaseTwo = !isCaseOne && args.userDataDir && !isUserDataDirExisting;
   const isCaseThree =
     !isCaseOne && !isCaseTwo && !isChromium && isUserDataDirExisting;
+
+  const isProfileReadable = await isDirReadable(args.userDataDir, args.profile);
   const isCaseFour =
     !isCaseOne &&
     !isCaseTwo &&
     !isCaseThree &&
     isChromium &&
     isUserDataDirExisting &&
-    (await isDirReadable(args.userDataDir, args.profile));
+    isProfileReadable;
 
   let validatedUserDataDir, validatedProfile;
   if (isCaseOne) {
@@ -169,8 +174,12 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
         " positive values.",
     );
   }
+
+  assert(typeof args.height === "string");
   const viewportHeight = parseInt(args.height, 10);
   assert.notDeepStrictEqual(viewportHeight, NaN);
+
+  assert(typeof args.width === "string");
   const viewportWidth = parseInt(args.width, 10);
   assert.notDeepStrictEqual(viewportWidth, NaN);
 
@@ -182,14 +191,29 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
         "seconds, not milliseconds.",
     );
   }
+  assert(typeof args.timeout === "string");
   const timeoutSeconds = parseInt(args.timeout, 10);
   assert.notDeepStrictEqual(timeoutSeconds, NaN);
 
+  assert(args.browser in BrowserType);
+  const browserType = args.browser as BrowserType;
+
+  assert(args.logging in LoggingLevel);
+  const loggingLevel = args.logging as LoggingLevel;
+
+  const measurementTypes: MeasurementType[] = [];
+  for (const aMeasurementType of args.measurements) {
+    assert(aMeasurementType in MeasurementType);
+    measurementTypes.push(aMeasurementType as MeasurementType);
+  }
+
+  assert(typeof args.seconds === "number");
+
   return {
     binary: binaryPath,
-    browser: args.browser,
-    logLevel: args.logging,
-    measurements: args.measurements,
+    browser: browserType,
+    loggingLevel: loggingLevel,
+    measurements: measurementTypes,
     profile: validatedProfile,
     seconds: args.seconds,
     timeout: timeoutSeconds,

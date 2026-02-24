@@ -1,6 +1,11 @@
 #!/usr/bin/env node
+import assert from "node:assert/strict";
 
-import { ArgumentParser, ArgumentDefaultsHelpFormatter } from "argparse";
+import {
+  ArgumentParser,
+  ArgumentDefaultsHelpFormatter,
+  Namespace,
+} from "argparse";
 
 import { launch } from "./browser.js";
 import { runConfigForArgs } from "./config.js";
@@ -83,11 +88,12 @@ parser.add_argument("--logging", {
     "the measurement.",
 });
 
-const rawArgs = parser.parse_args();
+const rawArgs = parser.parse_args() as unknown;
+assert(rawArgs instanceof Namespace);
 
 const runConfig = await runConfigForArgs(rawArgs);
-const { measurements, url, seconds, timeout, logLevel } = runConfig;
-const logger = getLogger(logLevel);
+const { measurements, url, seconds, timeout, loggingLevel } = runConfig;
+const logger = getLogger(loggingLevel);
 const browserContext = await launch(logger, runConfig);
 const results = await measureURL(
   logger,

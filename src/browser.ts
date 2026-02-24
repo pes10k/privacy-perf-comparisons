@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 
-import { BrowserContext, chromium, firefox, webkit } from "playwright";
+import { BrowserContext, chromium, firefox, webkit } from "@playwright/test";
 
 import { Logger } from "./logging.js";
-import { BrowserType, LaunchArgs, Path, RunConfig } from "./types.js";
+import {
+  BrowserType,
+  PersistentLaunchOptions,
+  Path,
+  RunConfig,
+} from "./types.js";
 
 const browserTypeMapping = {
   [BrowserType.Brave]: chromium,
@@ -31,7 +36,7 @@ const launchArgsEmpty = (): string[] => {
   return [];
 };
 
-const launchArgsForConfig = (config: RunConfig): LaunchArgs => {
+const launchArgsForConfig = (config: RunConfig): PersistentLaunchOptions => {
   let launchArgsFunc;
 
   switch (config.browser) {
@@ -52,7 +57,7 @@ const launchArgsForConfig = (config: RunConfig): LaunchArgs => {
   const browserArgs = launchArgsFunc(config);
 
   const defaultBrowserArgs: string[] = [];
-  const launchArgs: LaunchArgs = {
+  const launchOptions: PersistentLaunchOptions = {
     args: defaultBrowserArgs.concat(browserArgs),
     executablePath: config.binary,
     screen: {
@@ -64,13 +69,13 @@ const launchArgsForConfig = (config: RunConfig): LaunchArgs => {
     headless: false,
   };
 
-  return launchArgs;
+  return launchOptions;
 };
 
 const getContext = async (
   browser: BrowserType,
   userDataDir: Path,
-  launchArgs: LaunchArgs,
+  launchArgs: PersistentLaunchOptions,
 ): Promise<BrowserContext> => {
   const browserType = browserTypeMapping[browser];
   assert(browserType);

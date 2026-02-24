@@ -17,27 +17,22 @@ type ResourceType = string;
 type Timestamp = number;
 type URLString = string;
 
-interface NetDatapoint {
+interface Datapoint {
   size: number;
   time: Timestamp;
   type: ResourceType;
   url: URLString;
 }
 
-interface NavigationDatapoints {
-  request: NetDatapoint;
-  response: NetDatapoint;
-}
-
 class PageNetworkLogger {
-  readonly #owner: NetworkLogger;
-  readonly #requests: NetDatapoint[] = [];
-  readonly #responses: NetDatapoint[] = [];
+  readonly #owner: ContextNetworkLogger;
+  readonly #requests: Datapoint[] = [];
+  readonly #responses: Datapoint[] = [];
   readonly #pageURL: URLString;
   readonly #logger: Logger;
   readonly #startTime: number;
 
-  constructor(owner: NetworkLogger, logger: Logger, pageURL: URLString) {
+  constructor(owner: ContextNetworkLogger, logger: Logger, pageURL: URLString) {
     this.#owner = owner;
     this.#pageURL = pageURL;
     this.#logger = logger;
@@ -70,7 +65,7 @@ class PageNetworkLogger {
     return false;
   }
 
-  addWebSocketRequest(url: URLString, data: WSFrame): NetDatapoint | null {
+  addWebSocketRequest(url: URLString, data: WSFrame): Datapoint | null {
     if (this.logErrorIfClosed("ws request", url)) {
       return null;
     }
@@ -86,7 +81,7 @@ class PageNetworkLogger {
     return datapoint;
   }
 
-  addWebSocketResponse(url: URLString, data: WSFrame): NetDatapoint | null {
+  addWebSocketResponse(url: URLString, data: WSFrame): Datapoint | null {
     if (this.logErrorIfClosed("ws response", url)) {
       return null;
     }
@@ -102,7 +97,7 @@ class PageNetworkLogger {
     return datapoint;
   }
 
-  async addRequest(request: Request): Promise<NetDatapoint | null> {
+  async addRequest(request: Request): Promise<Datapoint | null> {
     if (this.logErrorIfClosed("request", request.url())) {
       return null;
     }
@@ -119,7 +114,7 @@ class PageNetworkLogger {
     return datapoint;
   }
 
-  async addResponse(response: Response): Promise<NetDatapoint | null> {
+  async addResponse(response: Response): Promise<Datapoint | null> {
     if (this.logErrorIfClosed("response", response.url())) {
       return null;
     }
@@ -148,9 +143,9 @@ class PageNetworkLogger {
   }
 }
 
-class NetworkLogger {
-  readonly #pageMeasurements: PageNetworkLogger[] = [];
-  readonly #pageToFrameMapping: WeakMap<Page, PageNetworkLogger>;
+class ContextNetworkLogger {
+  readonly #pageLoggers: PageNetworkLogger[] = [];
+  readonly #pageToLoggerMap: WeakMap<Page, PageNetworkLogger>;
   readonly #logger: Logger;
   readonly #startTime: number;
 
@@ -159,14 +154,14 @@ class NetworkLogger {
 
   constructor(logger: Logger) {
     this.#startTime = Date.now();
-    this.#pageToFrameMapping = new WeakMap();
+    this.#pageToLoggerMap = new WeakMap();
     this.#logger = logger;
   }
 
-  async addPageNavigation(
-    page: Page,
-    response: Response,
-  ): Promise<NavigationDatapoints | null> {
+  // Used to record the request for thats driving a page navigation (i.e.,
+  // the initial request to start automation, caused by something like
+  // a puppeteer / playwright page.goto() call).
+  async addAutomationPageNavigation(page: Page, response: Response) {
     if (this.isClosed()) {
       this.#logger.error(
         "trying to record top frame navigation, " +
@@ -176,7 +171,7 @@ class NetworkLogger {
       return null;
     }
 
-    const pageMeasurements = this.#pageToFrameMapping.get(page);
+    const pageMeasurements = this.#pageToLoggerMap.get(page);
     if (!pageMeasurements) {
       const errMsg =
         "Page navigation for an unknown page. " + `page url="${page.url()}"`;
@@ -185,18 +180,38 @@ class NetworkLogger {
     }
 
     const navRequest = response.request();
-    const requestDatapoint = await pageMeasurements.addRequest(navRequest);
-    assert(requestDatapoint);
-    const responseDatapoint = await pageMeasurements.addResponse(response);
-    assert(responseDatapoint);
-
-    return {
-      request: requestDatapoint,
-      response: responseDatapoint,
-    };
+    await pageMeasurements.addRequest(navRequest);
+    await pageMeasurements.addResponse(response);
   }
 
-  measurementsForNewTopFrame(page: Page): PageNetworkLogger | null {
+  addWSRequest(page: Page, url: URLString, data: WSFrame): Datapoint | null {
+    const pageForRequest = this.#pageToLoggerMap.get(page);
+    assert(pageForRequest);
+    return pageForRequest.addWebSocketRequest(url, data);
+  }
+
+  addWSResponse(page: Page, url: URLString, data: WSFrame): Datapoint | null {
+    const pageForResponse = this.#pageToLoggerMap.get(page);
+    assert(pageForResponse);
+    return pageForResponse.addWebSocketResponse(url, data);
+  }
+
+  async addRequest(page: Page, request: Request): Promise<Datapoint | null> {
+    const pageForRequest = this.#pageToLoggerMap.get(page);
+    assert(pageForRequest);
+    return await pageForRequest.addRequest(request);
+  }
+
+  async addResponse(page: Page, response: Response): Promise<Datapoint | null> {
+    const pageForResponse = this.#pageToLoggerMap.get(page);
+    assert(pageForResponse);
+    return await pageForResponse.addResponse(response);
+  }
+
+  // Notes that the top level frame in the page has navigated, and so
+  // any future requests that happen on the page are happening on a different
+  // top level document.
+  notePageNavigation(page: Page): PageNetworkLogger | null {
     if (this.isClosed()) {
       this.#logger.error(
         "trying to add measurements for new top frame " +
@@ -205,14 +220,10 @@ class NetworkLogger {
       );
       return null;
     }
-    const newMeasurements = new PageNetworkLogger(
-      this,
-      this.#logger,
-      page.url(),
-    );
-    this.#pageMeasurements.push(newMeasurements);
-    this.#pageToFrameMapping.set(page, newMeasurements);
-    return newMeasurements;
+    const pageLogger = new PageNetworkLogger(this, this.#logger, page.url());
+    this.#pageLoggers.push(pageLogger);
+    this.#pageToLoggerMap.set(page, pageLogger);
+    return pageLogger;
   }
 
   isClosed(): boolean {
@@ -220,12 +231,17 @@ class NetworkLogger {
   }
 
   toJSON(): Serializable {
+    const pageReports: Serializable[] = [];
+    for (const aLogger of this.#pageLoggers) {
+      pageReports.push(aLogger.toJSON());
+    }
+
     return {
       meta: {
         startTime: this.#startTime,
         endTime: this.#endTime,
       },
-      pages: this.#pageMeasurements.map((x) => x.toJSON()),
+      pages: pageReports,
     };
   }
 
@@ -241,36 +257,12 @@ class NetworkLogger {
   }
 }
 
-const instrumentNewPageContent = (
-  measurements: PageNetworkLogger,
-  page: Page,
-) => {
-  page.on("websocket", (webSocket: WebSocket) => {
-    const wsUrl = webSocket.url();
-    webSocket.on("framesent", (data: { payload: WSFrame }) => {
-      measurements.addWebSocketRequest(wsUrl, data.payload);
-    });
-
-    webSocket.on("framereceived", (data: { payload: WSFrame }) => {
-      measurements.addWebSocketRequest(wsUrl, data.payload);
-    });
-  });
-
-  page.on("request", async (request: Request) => {
-    await measurements.addRequest(request);
-  });
-
-  page.on("response", async (response: Response) => {
-    await measurements.addResponse(response);
-  });
-};
-
 export class NetworkMeasurer extends BaseMeasurer {
-  readonly #netLogger: NetworkLogger;
+  readonly #netLogger: ContextNetworkLogger;
 
   constructor(logger: Logger, url: URL, context: BrowserContext) {
     super(logger, url, context);
-    this.#netLogger = new NetworkLogger(logger);
+    this.#netLogger = new ContextNetworkLogger(logger);
   }
 
   measurementType(): MeasurementType {
@@ -280,6 +272,25 @@ export class NetworkMeasurer extends BaseMeasurer {
   instrument() {
     super.instrument();
     this.context.on("page", (page: Page) => {
+      page.on("websocket", (webSocket: WebSocket) => {
+        const wsUrl = webSocket.url();
+        webSocket.on("framesent", (data: { payload: WSFrame }) => {
+          this.#netLogger.addWSRequest(page, wsUrl, data.payload);
+        });
+
+        webSocket.on("framereceived", (data: { payload: WSFrame }) => {
+          this.#netLogger.addWSResponse(page, wsUrl, data.payload);
+        });
+      });
+
+      page.on("request", async (request: Request) => {
+        return await this.#netLogger.addRequest(page, request);
+      });
+
+      page.on("response", async (response: Response) => {
+        return await this.#netLogger.addResponse(page, response);
+      });
+
       page.on("framenavigated", (frame: Frame) => {
         // If any frame other than the top level frame is navigating,
         // we don't care about it (since requests and other behaviors
@@ -288,26 +299,13 @@ export class NetworkMeasurer extends BaseMeasurer {
         if (page.mainFrame() !== frame) {
           return;
         }
-
-        // Also, only bother instrumenting public Web URLs. We don't want
-        // to bother with cases where the top frame is about:blank or file://
-        // or a data URL, etc.
-        const pageURL = new URL(frame.url(), page.url());
-        if (!pageURL.protocol.startsWith("http")) {
-          return;
-        }
-
-        const pageMeasurements =
-          this.#netLogger.measurementsForNewTopFrame(page);
-        if (pageMeasurements) {
-          instrumentNewPageContent(pageMeasurements, page);
-        }
+        this.#netLogger.notePageNavigation(page);
       });
     });
   }
 
   async addInitNavigationResponse(page: Page, response: Response) {
-    await this.#netLogger.addPageNavigation(page, response);
+    await this.#netLogger.addAutomationPageNavigation(page, response);
   }
 
   // Disabling the linter here because this method is async, so that

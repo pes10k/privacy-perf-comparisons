@@ -3,7 +3,6 @@ import { defineConfig } from 'eslint/config';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import tseslint from 'typescript-eslint';
 
-
 export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
@@ -15,13 +14,6 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-  },
-  {
-    rules: {
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-argument': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
-    }
   },
   eslintPluginPrettierRecommended,
 );
