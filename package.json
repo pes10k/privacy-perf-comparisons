@@ -12,7 +12,8 @@
     "install-browsers": "npx playwright install",
     "lint": "npx eslint -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
     "lint:fix": "npx eslint --fix -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
-    "start": "NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
+    "start": "node ./dist/cli.js",
+    "start:debug": "NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
   },
   "bin": {
     "browser-perf": "dist/cli.js"
