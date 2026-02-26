@@ -4,8 +4,6 @@
         "target": "es2024",
         "outDir": "dist",
         "sourceMap": true
-        // "inlineSourceMap": true,
-        // "inlineSources": true
     },
     "include": ["src/**/*.ts"]
 }

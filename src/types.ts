@@ -1,3 +1,5 @@
+import { Writable } from "node:stream";
+
 import { LaunchOptions } from "playwright";
 
 import { LoggingLevel } from "./logging.js";
@@ -38,6 +40,7 @@ export interface RunConfig {
   browser: BrowserType;
   loggingLevel: LoggingLevel;
   measurements: MeasurementType[];
+  output: Writable;
   profile?: string;
   seconds: number;
   timeout: number;

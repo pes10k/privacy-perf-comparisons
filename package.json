@@ -1,22 +1,20 @@
 {
-  "name": "browser-perf",
-  "version": "0.0.1",
+  "name": "browser-perf-logger",
+  "version": "0.1.0",
   "description": "Automated, cross-browser measurements of performance.",
   "license": "ISC",
   "author": "Peter Snyder <pes@brave.com>",
   "type": "module",
   "main": "dist/cli.js",
+  "bin": "dist/cli.js",
   "scripts": {
     "build": "npx tsc",
     "clean": "rm -Rf ./dist/*",
     "install-browsers": "npx playwright install",
     "lint": "npx eslint -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
     "lint:fix": "npx eslint --fix -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
-    "start": "node ./dist/cli.js",
-    "start:debug": "NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
-  },
-  "bin": {
-    "browser-perf": "dist/cli.js"
+    "go": "node ./dist/cli.js",
+    "go:debug": "NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

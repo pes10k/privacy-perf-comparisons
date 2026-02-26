@@ -1,29 +1,116 @@
 import assert from "node:assert/strict";
-import { access, constants, mkdtempDisposable } from "node:fs/promises";
+import { access, constants, mkdtempDisposable, open, stat, } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 import { BrowserType, MeasurementType } from "./types.js";
 import { LoggingLevel } from "./logging.js";
+const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
-const isPathToExecFile = async (path) => {
+const _fileCheck = async (mode, ...segments) => {
     try {
-        await access(path, constants.X_OK);
+        await access(join(...segments), mode);
         return true;
     }
     catch {
         return false;
     }
 };
-const isDirReadable = async (...pathSegments) => {
+const isPathToDir = async (...segments) => {
     try {
-        await access(join(...pathSegments), constants.R_OK);
-        return true;
+        const fsResult = await stat(join(...segments));
+        return fsResult.isDirectory();
     }
     catch {
         return false;
     }
+};
+const isPathToReadableDir = async (...segments) => {
+    const isPathADir = await isPathToDir(...segments);
+    if (!isPathADir) {
+        return false;
+    }
+    return await _fileCheck(R_OK, ...segments);
+};
+const isPathToWriteableDir = async (...segments) => {
+    const isPathADir = await isPathToDir(...segments);
+    if (!isPathADir) {
+        return false;
+    }
+    return await _fileCheck(W_OK | X_OK, ...segments);
+};
+const isPathToFile = async (...segments) => {
+    try {
+        const fsResult = await stat(join(...segments));
+        return fsResult.isFile();
+    }
+    catch {
+        return false;
+    }
+};
+const isPathToExecFile = async (...segments) => {
+    return await _fileCheck(X_OK, ...segments);
+};
+const isPathToWritableFile = async (...segments) => {
+    const isPathFile = await isPathToFile(...segments);
+    if (!isPathFile) {
+        return false;
+    }
+    return await _fileCheck(W_OK, ...segments);
+};
+const makeResultFilename = async (dir, url) => {
+    const fileName = url.hostname.replace(/[^a-z0-9.\-_]/gi, "_").toLowerCase();
+    const fileExt = ".json";
+    const attemptMax = 1000;
+    let attempt = 0;
+    while (attempt < attemptMax) {
+        const fileInfix = attempt > 0 ? `_${attempt.toString()}` : "";
+        const fileGuess = fileName + fileInfix + fileExt;
+        if (!(await isPathToFile(dir, fileGuess))) {
+            return join(dir, fileGuess);
+        }
+        attempt += 1;
+    }
+    throw new Error("Unable to generate a file to write to. In target directory, attempted " +
+        "files already exist.\n" +
+        `target directory: ${dir}\n` +
+        `initial attempted file: ${fileName}${fileExt}\n` +
+        `other attempts: ${fileName}_[1...${attemptMax.toString()}].json`);
+};
+// Generate the stream to write results to. This might be a stream for
+// a location on disk to write results to, or it might be STDOUT.
+//
+// The rules for where to write results to are the following:
+// - if the output argument was empty or unused, then results are written to
+//   STDOUT, else
+// - if the output argument matches an existing file on disk, then we try to
+//   overwrite that file, else
+// - if the output argument matches a directory on disk, then we generate
+//   a filename based on the initial URL being measured, and write to that file
+// - Otherwise, try to write results to the given path.
+const handleForResults = async (output, url) => {
+    // Case 1, in the function docblock: write to stdout.
+    if (output === undefined || output.trim().length === 0) {
+        return process.stdout;
+    }
+    // Case 2 in the function docblock: write to given path.
+    if (await isPathToFile(output)) {
+        if (!(await isPathToWritableFile(output))) {
+            throw new Error(`--output path is not writeable: "${output}"`);
+        }
+        return (await open(output, "w")).createWriteStream();
+    }
+    // Case 3 in function docblock: write to file in given directory.
+    if (await isPathToDir(output)) {
+        if (!(await isPathToWriteableDir(output))) {
+            throw new Error(`--output directory is not writeable: "${output}"`);
+        }
+        const resultPath = await makeResultFilename(output, url);
+        return (await open(resultPath, "w")).createWriteStream();
+    }
+    // Case 4, try to write to the given output path.
+    return (await open(output, "w")).createWriteStream();
 };
 export const runConfigForArgs = async (args) => {
     assert(args.url instanceof URL);
@@ -71,9 +158,9 @@ export const runConfigForArgs = async (args) => {
         isUserDataDirExisting = false;
         isProfileReadable = false;
     }
-    else if (await isDirReadable(userDataDir)) {
+    else if (await isPathToReadableDir(userDataDir)) {
         isUserDataDirExisting = true;
-        isProfileReadable = await isDirReadable(userDataDir, args.profile);
+        isProfileReadable = await isPathToReadableDir(userDataDir, args.profile);
     }
     const isCaseOne = !userDataDir;
     const isCaseTwo = !isCaseOne && !isUserDataDirExisting;
@@ -172,11 +259,15 @@ export const runConfigForArgs = async (args) => {
     assert(typeof args.height === "number");
     assert(typeof args.width === "number");
     assert(typeof args.seconds === "number");
+    assert(!args.output || typeof args.output === "string");
+    const outputPath = args.output;
+    const outputHandle = await handleForResults(outputPath, args.url);
     return {
         binary: binaryPath,
         browser: browserType,
         loggingLevel: loggingLevel,
         measurements: measurementTypes,
+        output: outputHandle,
         profile: validatedProfile,
         seconds: args.seconds,
         timeout: args.timeout,
