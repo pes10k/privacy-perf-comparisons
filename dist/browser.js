@@ -7,6 +7,9 @@ const browserTypeMapping = {
     [BrowserType.Gecko]: firefox,
     [BrowserType.WebKit]: webkit,
 };
+const launchArgsEmpty = () => {
+    return [];
+};
 const launchArgsForBrave = (config) => {
     const launchArgs = launchArgsForChromium(config);
     launchArgs.push("--disable-brave-update");
@@ -20,8 +23,8 @@ const launchArgsForChromium = (config) => {
     }
     return launchArgs;
 };
-const launchArgsEmpty = () => {
-    return [];
+const launchArgsForGecko = () => {
+    return launchArgsEmpty();
 };
 const launchArgsForConfig = (config) => {
     let launchArgsFunc;
@@ -33,7 +36,7 @@ const launchArgsForConfig = (config) => {
             launchArgsFunc = launchArgsForChromium;
             break;
         case BrowserType.Gecko:
-            launchArgsFunc = launchArgsEmpty;
+            launchArgsFunc = launchArgsForGecko;
             break;
         case BrowserType.WebKit:
             launchArgsFunc = launchArgsEmpty;

@@ -1,6 +1,6 @@
 {
   "name": "browser-perf-logger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Automated, cross-browser measurements of performance.",
   "license": "ISC",
   "author": "Peter Snyder <pes@brave.com>",
@@ -14,7 +14,7 @@
     "lint": "npx eslint -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
     "lint:fix": "npx eslint --fix -c ./eslint.config.js ./src/*.ts ./src/**/*.ts",
     "go": "node ./dist/cli.js",
-    "go:debug": "NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
+    "go:debug": "PERF_TESTS_DEBUG=1 NODE_OPTIONS=--enable-source-maps node ./dist/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

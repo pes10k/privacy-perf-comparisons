@@ -21,6 +21,7 @@ export type AttachMeasurerFunc = (
 ) => BaseMeasurer;
 
 export abstract class BaseMeasurer {
+  readonly type?: MeasurementType;
   readonly logger: Logger;
   readonly url: URL;
   readonly context: BrowserContext;

@@ -13,8 +13,10 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
         const aMeasurerType = measurerTypeToClassMap[aMeasurementType];
         const aMeasurer = new aMeasurerType(logger, url, context);
         aMeasurer.instrumentContext();
+        logger.verbose("Instrumenting context for measurement: ", aMeasurementType);
         measurers.set(aMeasurementType, aMeasurer);
     }
+    logger.verbose("Creating empty page (i.e., new tab).");
     const page = await context.newPage();
     const startTime = new Date();
     logger.info(`Navigating to url="${page.url()}"`);
@@ -27,11 +29,16 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
     logger.info(`Letting page load for "${String(seconds)}" seconds`);
     await page.waitForTimeout(seconds * 1000);
     for (const aMeasurer of measurers.values()) {
+        logger.verbose("Closing measurements for: ", aMeasurer.type);
         aMeasurer.close();
     }
-    await page.waitForTimeout(5 * 1000);
+    const eventDrainTimeMs = 5 * 1000;
+    logger.verbose(`Waiting "${String(eventDrainTimeMs)}ms" for events 'in-the-air' to ` +
+        "complete. (Note, they are not include in measurement amounts)");
+    await page.waitForTimeout(eventDrainTimeMs);
     const results = {};
     for (const [aMeasurementType, aMeasurer] of measurers.entries()) {
+        logger.verbose(`Collecting results for measurement "${aMeasurementType}" from context`);
         results[aMeasurementType] = await aMeasurer.collect();
     }
     await context.close();

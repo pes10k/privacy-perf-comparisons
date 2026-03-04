@@ -258,6 +258,7 @@ class ContextNetworkLogger {
 }
 
 export class NetworkMeasurer extends BaseMeasurer {
+  readonly type: MeasurementType = MeasurementType.Network;
   readonly #netLogger: ContextNetworkLogger;
 
   constructor(logger: Logger, url: URL, context: BrowserContext) {

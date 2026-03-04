@@ -18,6 +18,7 @@ const injected_getPageMeasurements = () => {
     });
 };
 export class TimingMeasurer extends BaseMeasurer {
+    type = MeasurementType.Timing;
     measurementType() {
         return MeasurementType.Timing;
     }

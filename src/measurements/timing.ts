@@ -22,6 +22,8 @@ const injected_getPageMeasurements = (): Promise<Serializable> => {
 };
 
 export class TimingMeasurer extends BaseMeasurer {
+  readonly type: MeasurementType = MeasurementType.Timing;
+
   measurementType(): MeasurementType {
     return MeasurementType.Timing;
   }

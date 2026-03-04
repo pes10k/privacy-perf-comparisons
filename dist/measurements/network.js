@@ -199,6 +199,7 @@ class ContextNetworkLogger {
     }
 }
 export class NetworkMeasurer extends BaseMeasurer {
+    type = MeasurementType.Network;
     #netLogger;
     constructor(logger, url, context) {
         super(logger, url, context);

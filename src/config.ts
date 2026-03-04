@@ -14,11 +14,21 @@ import { Namespace } from "argparse";
 import { chromium, firefox, webkit } from "playwright";
 
 import { BrowserType, MeasurementType, Path, RunConfig } from "./types.js";
-import { LoggingLevel } from "./logging.js";
+import { getLogger, LoggingLevel } from "./logging.js";
 
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
+
+export const defaultArgs = {
+  profile: "Default",
+  seconds: 30,
+  timeout: 30,
+  viewport: {
+    height: 1024,
+    width: 1280,
+  },
+};
 
 const _fileCheck = async (
   mode: number,
@@ -102,6 +112,14 @@ const makeResultFilename = async (dir: Path, url: URL): Promise<Path> => {
   );
 };
 
+const ignoreConfChecksEnvVarName = "PERF_CHECKS_IGNORE";
+const shouldIgnoreConfChecks = (): boolean => {
+  if (process.env[ignoreConfChecksEnvVarName] === "1") {
+    return true;
+  }
+  return false;
+};
+
 // Generate the stream to write results to. This might be a stream for
 // a location on disk to write results to, or it might be STDOUT.
 //
@@ -144,6 +162,14 @@ const handleForResults = async (
 };
 
 export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
+  const loggingLevel = args.logging as LoggingLevel;
+  assert(Object.values(LoggingLevel).includes(loggingLevel));
+  const logger = getLogger(loggingLevel);
+  const logMsg = (...args: unknown[]): void => {
+    logger.verbose("Config Validation: ", ...args);
+  };
+  logMsg("Raw arguments=", args);
+
   assert(args.url instanceof URL);
   if (!validSchemes.includes(args.url.protocol)) {
     throw new Error(
@@ -166,13 +192,21 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   const isChromium =
     args.browser === BrowserType.Chromium || args.browser === BrowserType.Brave;
 
+  let userDataDir: undefined | string;
+  if (typeof args.user_data_dir === "string") {
+    userDataDir = args.user_data_dir;
+  }
+
   assert(typeof args.profile === "string");
-  const userDataDir = args.userDataDir as undefined | string;
-  assert(userDataDir === undefined || userDataDir === "string");
-  if (args.profile && !isChromium) {
+  if (
+    args.browser === BrowserType.Gecko &&
+    args.profile !== defaultArgs.profile
+  ) {
     throw new Error(
-      "Invalid profile. Only Chromium browsers support " +
-        "multiple profiles in a single user data dir.",
+      "Cannot use different profiles within the same profile " +
+        "directory for Gecko browsers. Use --user-data-dir to use different " +
+        "browser configurations for gecko browsers (instead of multiple " +
+        "profiles within the same profile directory).",
     );
   }
 
@@ -220,14 +254,23 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     isProfileReadable;
 
   let validatedUserDataDir, validatedProfile;
+  logMsg("--user-data-dir validation");
   if (isCaseOne) {
     const tempDirPath = await mkdtempDisposable(join(tmpdir(), programName));
     validatedUserDataDir = tempDirPath.path;
-  } else if (isCaseTwo || isCaseThree) {
+    logMsg("\t", "- creating temporary user-data dir: ", validatedUserDataDir);
+  } else if (isCaseTwo) {
     validatedUserDataDir = userDataDir;
+    logMsg("\t", "- creating new user-data dir: ", validatedUserDataDir);
+  } else if (isCaseThree) {
+    validatedUserDataDir = userDataDir;
+    logMsg("\t", "- using existing user-data dir: ", validatedUserDataDir);
   } else if (isCaseFour) {
+    assert(userDataDir);
     validatedUserDataDir = join(userDataDir, args.profile);
     validatedProfile = args.profile;
+    logMsg("\t", "- using user-data dir: ", validatedUserDataDir);
+    logMsg("\t", "- with profile name: ", args.profile);
   } else {
     throw new Error(
       "Invalid user-data-dir config.  Either must specify no " +
@@ -237,6 +280,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
         "chromium).",
     );
   }
+  assert(validatedUserDataDir);
 
   // We only allow the `binary` argument for Chromium-family browsers,
   // since we can do our measurements on the "stock" versions of these.
@@ -247,6 +291,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
 
   // If we weren't passed a path to a browser binary, use the paths to the
   // playwright binaries.
+  let isUsingPlaywrightBinary = false;
   if (args.binary_path === undefined) {
     switch (args.browser) {
       case BrowserType.Brave:
@@ -255,37 +300,27 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
             "playwright does not have a default Brave binary included",
         );
       case BrowserType.Chromium:
+        isUsingPlaywrightBinary = true;
         binaryPath = chromium.executablePath();
         break;
       case BrowserType.Gecko:
+        isUsingPlaywrightBinary = true;
         binaryPath = firefox.executablePath();
         break;
       case BrowserType.WebKit:
+        isUsingPlaywrightBinary = true;
         binaryPath = webkit.executablePath();
         break;
     }
   } else {
     assert(typeof args.binary_path === "string");
-    switch (args.browser) {
-      case BrowserType.Brave:
-      case BrowserType.Chromium:
-        if (!(await isPathToExecFile(args.binary_path))) {
-          throw new Error(
-            `Invalid binary path. "${args.binary_path}" is not an ` +
-              "executable file.",
-          );
-        }
-        binaryPath = args.binary_path;
-        break;
-      case BrowserType.Gecko:
-      case BrowserType.WebKit:
-        throw new Error(
-          "Invalid binary path. Unable to use --binary argument " +
-            "with --browser=firefox or gecko, since these tests only work with " +
-            "the playwright-patched versions of these browsers. You can install " +
-            'them with "npm run install-browsers".',
-        );
+    if (!(await isPathToExecFile(args.binary_path))) {
+      throw new Error(
+        `Invalid binary path. "${args.binary_path}" is not an ` +
+          "executable file.",
+      );
     }
+    binaryPath = args.binary_path;
   }
   assert.ok(binaryPath);
 
@@ -309,14 +344,34 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   const browserType = args.browser as BrowserType;
   assert(Object.values(BrowserType).includes(browserType));
 
-  const loggingLevel = args.logging as LoggingLevel;
-  assert(Object.values(LoggingLevel).includes(loggingLevel));
-
-  const measurementTypes: MeasurementType[] = [];
+  const mesToPerform: MeasurementType[] = [];
   for (const aMeasurementTypeRaw of args.measurements) {
     const measurementType = aMeasurementTypeRaw as MeasurementType;
     assert(Object.values(MeasurementType).includes(measurementType));
-    measurementTypes.push(measurementType);
+    mesToPerform.push(measurementType);
+  }
+
+  // Only some measurements require the playwright-modified binaries; some
+  // tests will run fine even in stock versions of Firefox, Safari, etc.
+  // Here we check 1. if any of the measurements we're about to run (specified
+  // with --measurements) require the capabilities that playwright patches into
+  // Gecko and WebKit, and 2. if it looks like the binary we're about to run
+  // those measurements (specified with --binary-path) includes those
+  // capabilities.
+  const mesRequiringExt = new Set([MeasurementType.Network]);
+  const doMesRequireExt =
+    new Set(mesToPerform).intersection(mesRequiringExt).size > 0;
+  const doesBrowserSupportExt = isChromium || isUsingPlaywrightBinary;
+  if (doMesRequireExt && !doesBrowserSupportExt) {
+    if (!shouldIgnoreConfChecks()) {
+      throw new Error(
+        "The specified measurements cannot be run in the " +
+          "specified browser. These measurements require either a Chromium " +
+          "browser, or a browser including the playwright patches.\n\n" +
+          "If you think this is incorrect, you can override this check with " +
+          `${ignoreConfChecksEnvVarName}=1`,
+      );
+    }
   }
 
   assert(typeof args.height === "number");
@@ -331,7 +386,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     binary: binaryPath,
     browser: browserType,
     loggingLevel: loggingLevel,
-    measurements: measurementTypes,
+    measurements: mesToPerform,
     output: outputHandle,
     profile: validatedProfile,
     seconds: args.seconds,

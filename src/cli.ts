@@ -8,10 +8,12 @@ import {
 } from "argparse";
 
 import { launch } from "./browser.js";
-import { runConfigForArgs } from "./config.js";
+import { defaultArgs, runConfigForArgs } from "./config.js";
 import { getLogger, LoggingLevel } from "./logging.js";
 import { measureURL } from "./measure.js";
 import { BrowserType, MeasurementType } from "./types.js";
+
+const isDebugMode = process.env.PERF_TESTS_DEBUG === "1";
 
 const parser = new ArgumentParser({
   description: "Run performance tests for a playwright version of a browser.",
@@ -25,10 +27,13 @@ parser.add_argument("-b", "--browser", {
 parser.add_argument("-d", "--user-data-dir", {
   help:
     "Path to the user data directory to load and save persistent state " +
-    "to. For chromium browsers, this will be a directory containing multiple " +
+    "to. For Chromium browsers, this will be a directory containing multiple " +
     "profiles. For other browsers, this directory will be the state for " +
     "a single profile. If not provided, will create a new temporary " +
-    "user-data directory.",
+    "user-data directory.\n\n" +
+    "*Note:* Gecko/Firefox measurements should use this flag for " +
+    "specifying the path for storing persistent user data (and not " +
+    "--profile).",
 });
 parser.add_argument("-l", "--logging", {
   choices: Object.values(LoggingLevel),
@@ -43,6 +48,7 @@ parser.add_argument("-m", "--measurements", {
   help:
     "Which measurements of performance to collect. By default, performs all " +
     "measurements.",
+  nargs: "+",
 });
 parser.add_argument("-o", "--output", {
   help:
@@ -55,18 +61,18 @@ parser.add_argument("-o", "--output", {
     "a path where no file exists, the results will be written to that path.",
 });
 parser.add_argument("-p", "--profile", {
-  default: "Default",
+  default: defaultArgs.profile,
   help:
-    "For chromium runs, this is the name of the profile in an existing " +
+    "For Chromium, this is the name of the profile in an existing " +
     "--user-data-dir directory to load. (Only used for Chromium browsers)",
 });
 parser.add_argument("-s", "--seconds", {
-  default: 30,
+  default: defaultArgs.seconds,
   help: "Number of seconds to wait while measuring page performance.",
   type: "int",
 });
 parser.add_argument("-t", "--timeout", {
-  default: 30,
+  default: defaultArgs.timeout,
   help:
     "Number of seconds to wait for the browser to complete tasks " +
     "separate from loading the given page (e.g., open the browser, " +
@@ -88,30 +94,43 @@ parser.add_argument("-x", "--binary-path", {
     "while the gecko and webkit ones do.",
 });
 parser.add_argument("--height", {
-  default: 1024,
+  default: defaultArgs.viewport.height,
   help: "The height of the browser viewport to use when loading pages.",
   type: "int",
 });
 parser.add_argument("--width", {
-  default: 1280,
+  default: defaultArgs.viewport.width,
   help: "The width of the browser viewport to use when loading pages.",
   type: "int",
 });
 
-const rawArgs = parser.parse_args() as unknown;
-assert(rawArgs instanceof Namespace);
+try {
+  const rawArgs = parser.parse_args() as unknown;
+  assert(rawArgs instanceof Namespace);
 
-const runConfig = await runConfigForArgs(rawArgs);
-const { measurements, url, seconds, timeout, loggingLevel } = runConfig;
-const logger = getLogger(loggingLevel);
-const browserContext = await launch(logger, runConfig);
-const results = await measureURL(
-  logger,
-  browserContext,
-  url,
-  seconds,
-  timeout,
-  measurements,
-);
+  const runConfig = await runConfigForArgs(rawArgs);
+  const { measurements, url, seconds, timeout, loggingLevel } = runConfig;
+  const logger = getLogger(loggingLevel);
+  const browserContext = await launch(logger, runConfig);
+  const results = await measureURL(
+    logger,
+    browserContext,
+    url,
+    seconds,
+    timeout,
+    measurements,
+  );
 
-runConfig.output.write(JSON.stringify(results));
+  runConfig.output.write(JSON.stringify(results));
+  process.exit(0);
+} catch (err) {
+  if (isDebugMode) {
+    throw err;
+  }
+  if (err instanceof Error) {
+    console.error(err.toString());
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
+}

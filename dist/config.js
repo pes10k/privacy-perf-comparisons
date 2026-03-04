@@ -4,10 +4,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 import { BrowserType, MeasurementType } from "./types.js";
-import { LoggingLevel } from "./logging.js";
+import { getLogger, LoggingLevel } from "./logging.js";
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
+export const defaultArgs = {
+    profile: "Default",
+    seconds: 30,
+    timeout: 30,
+    viewport: {
+        height: 1024,
+        width: 1280,
+    },
+};
 const _fileCheck = async (mode, ...segments) => {
     try {
         await access(join(...segments), mode);
@@ -78,6 +87,13 @@ const makeResultFilename = async (dir, url) => {
         `initial attempted file: ${fileName}${fileExt}\n` +
         `other attempts: ${fileName}_[1...${attemptMax.toString()}].json`);
 };
+const ignoreConfChecksEnvVarName = "PERF_CHECKS_IGNORE";
+const shouldIgnoreConfChecks = () => {
+    if (process.env[ignoreConfChecksEnvVarName] === "1") {
+        return true;
+    }
+    return false;
+};
 // Generate the stream to write results to. This might be a stream for
 // a location on disk to write results to, or it might be STDOUT.
 //
@@ -113,6 +129,13 @@ const handleForResults = async (output, url) => {
     return (await open(output, "w")).createWriteStream();
 };
 export const runConfigForArgs = async (args) => {
+    const loggingLevel = args.logging;
+    assert(Object.values(LoggingLevel).includes(loggingLevel));
+    const logger = getLogger(loggingLevel);
+    const logMsg = (...args) => {
+        logger.verbose("Config Validation: ", ...args);
+    };
+    logMsg("Raw arguments=", args);
     assert(args.url instanceof URL);
     if (!validSchemes.includes(args.url.protocol)) {
         throw new Error("Invalid URL. Must contain a http(s) scheme and hostname. Received " +
@@ -126,12 +149,17 @@ export const runConfigForArgs = async (args) => {
         throw new Error('Invalid "seconds". Must be a positive integer.');
     }
     const isChromium = args.browser === BrowserType.Chromium || args.browser === BrowserType.Brave;
+    let userDataDir;
+    if (typeof args.user_data_dir === "string") {
+        userDataDir = args.user_data_dir;
+    }
     assert(typeof args.profile === "string");
-    const userDataDir = args.userDataDir;
-    assert(userDataDir === undefined || userDataDir === "string");
-    if (args.profile && !isChromium) {
-        throw new Error("Invalid profile. Only Chromium browsers support " +
-            "multiple profiles in a single user data dir.");
+    if (args.browser === BrowserType.Gecko &&
+        args.profile !== defaultArgs.profile) {
+        throw new Error("Cannot use different profiles within the same profile " +
+            "directory for Gecko browsers. Use --user-data-dir to use different " +
+            "browser configurations for gecko browsers (instead of multiple " +
+            "profiles within the same profile directory).");
     }
     // Here we check that one of the following conditions are true:
     // 1. the user didn't specify a user-data-dir (in which case we create
@@ -172,16 +200,26 @@ export const runConfigForArgs = async (args) => {
         isUserDataDirExisting &&
         isProfileReadable;
     let validatedUserDataDir, validatedProfile;
+    logMsg("--user-data-dir validation");
     if (isCaseOne) {
         const tempDirPath = await mkdtempDisposable(join(tmpdir(), programName));
         validatedUserDataDir = tempDirPath.path;
+        logMsg("\t", "- creating temporary user-data dir: ", validatedUserDataDir);
     }
-    else if (isCaseTwo || isCaseThree) {
+    else if (isCaseTwo) {
         validatedUserDataDir = userDataDir;
+        logMsg("\t", "- creating new user-data dir: ", validatedUserDataDir);
+    }
+    else if (isCaseThree) {
+        validatedUserDataDir = userDataDir;
+        logMsg("\t", "- using existing user-data dir: ", validatedUserDataDir);
     }
     else if (isCaseFour) {
+        assert(userDataDir);
         validatedUserDataDir = join(userDataDir, args.profile);
         validatedProfile = args.profile;
+        logMsg("\t", "- using user-data dir: ", validatedUserDataDir);
+        logMsg("\t", "- with profile name: ", args.profile);
     }
     else {
         throw new Error("Invalid user-data-dir config.  Either must specify no " +
@@ -190,6 +228,7 @@ export const runConfigForArgs = async (args) => {
             "the specified profile as a subdirectory in the user-data-dir if " +
             "chromium).");
     }
+    assert(validatedUserDataDir);
     // We only allow the `binary` argument for Chromium-family browsers,
     // since we can do our measurements on the "stock" versions of these.
     // For Gecko and WebKit browsers, these require the playwright patches
@@ -198,40 +237,33 @@ export const runConfigForArgs = async (args) => {
     let binaryPath;
     // If we weren't passed a path to a browser binary, use the paths to the
     // playwright binaries.
+    let isUsingPlaywrightBinary = false;
     if (args.binary_path === undefined) {
         switch (args.browser) {
             case BrowserType.Brave:
                 throw new Error("Must include a binary path when testing Brave (since " +
                     "playwright does not have a default Brave binary included");
             case BrowserType.Chromium:
+                isUsingPlaywrightBinary = true;
                 binaryPath = chromium.executablePath();
                 break;
             case BrowserType.Gecko:
+                isUsingPlaywrightBinary = true;
                 binaryPath = firefox.executablePath();
                 break;
             case BrowserType.WebKit:
+                isUsingPlaywrightBinary = true;
                 binaryPath = webkit.executablePath();
                 break;
         }
     }
     else {
         assert(typeof args.binary_path === "string");
-        switch (args.browser) {
-            case BrowserType.Brave:
-            case BrowserType.Chromium:
-                if (!(await isPathToExecFile(args.binary_path))) {
-                    throw new Error(`Invalid binary path. "${args.binary_path}" is not an ` +
-                        "executable file.");
-                }
-                binaryPath = args.binary_path;
-                break;
-            case BrowserType.Gecko:
-            case BrowserType.WebKit:
-                throw new Error("Invalid binary path. Unable to use --binary argument " +
-                    "with --browser=firefox or gecko, since these tests only work with " +
-                    "the playwright-patched versions of these browsers. You can install " +
-                    'them with "npm run install-browsers".');
+        if (!(await isPathToExecFile(args.binary_path))) {
+            throw new Error(`Invalid binary path. "${args.binary_path}" is not an ` +
+                "executable file.");
         }
+        binaryPath = args.binary_path;
     }
     assert.ok(binaryPath);
     if (args.height <= 0 || args.width <= 0) {
@@ -248,13 +280,30 @@ export const runConfigForArgs = async (args) => {
     }
     const browserType = args.browser;
     assert(Object.values(BrowserType).includes(browserType));
-    const loggingLevel = args.logging;
-    assert(Object.values(LoggingLevel).includes(loggingLevel));
-    const measurementTypes = [];
+    const mesToPerform = [];
     for (const aMeasurementTypeRaw of args.measurements) {
         const measurementType = aMeasurementTypeRaw;
         assert(Object.values(MeasurementType).includes(measurementType));
-        measurementTypes.push(measurementType);
+        mesToPerform.push(measurementType);
+    }
+    // Only some measurements require the playwright-modified binaries; some
+    // tests will run fine even in stock versions of Firefox, Safari, etc.
+    // Here we check 1. if any of the measurements we're about to run (specified
+    // with --measurements) require the capabilities that playwright patches into
+    // Gecko and WebKit, and 2. if it looks like the binary we're about to run
+    // those measurements (specified with --binary-path) includes those
+    // capabilities.
+    const mesRequiringExt = new Set([MeasurementType.Network]);
+    const doMesRequireExt = new Set(mesToPerform).intersection(mesRequiringExt).size > 0;
+    const doesBrowserSupportExt = isChromium || isUsingPlaywrightBinary;
+    if (doMesRequireExt && !doesBrowserSupportExt) {
+        if (!shouldIgnoreConfChecks()) {
+            throw new Error("The specified measurements cannot be run in the " +
+                "specified browser. These measurements require either a Chromium " +
+                "browser, or a browser including the playwright patches.\n\n" +
+                "If you think this is incorrect, you can override this check with " +
+                `${ignoreConfChecksEnvVarName}=1`);
+        }
     }
     assert(typeof args.height === "number");
     assert(typeof args.width === "number");
@@ -266,7 +315,7 @@ export const runConfigForArgs = async (args) => {
         binary: binaryPath,
         browser: browserType,
         loggingLevel: loggingLevel,
-        measurements: measurementTypes,
+        measurements: mesToPerform,
         output: outputHandle,
         profile: validatedProfile,
         seconds: args.seconds,
