@@ -7,6 +7,9 @@ const approxLengthOfHeaders = (headers) => {
     for (const [key, value] of Object.entries(headers)) {
         totalLength += key.length;
         totalLength += value.length;
+        // Adding 4 here, 2 for the ": " in Header "<key>: <value>",
+        // and then 2 more for the "\r\n" after each header.
+        totalLength += 4;
     }
     return totalLength;
 };
