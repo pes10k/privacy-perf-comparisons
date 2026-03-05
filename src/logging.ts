@@ -1,5 +1,6 @@
 export enum LoggingLevel {
   None = "none",
+  Error = "error",
   Info = "info",
   Verbose = "verbose",
 }
@@ -7,6 +8,8 @@ export enum LoggingLevel {
 export type LogFunc = (...msg: unknown[]) => void;
 
 export interface Logger {
+  willLogFor: (level: LoggingLevel) => boolean;
+  level: LoggingLevel;
   info: LogFunc;
   verbose: LogFunc;
   error: LogFunc;
@@ -53,27 +56,44 @@ const infoFunc = baseLogFunction.bind(undefined, "INFO:", false);
 const errorFunc = baseLogFunction.bind(undefined, "ERROR:", true);
 
 const nullLogger = Object.freeze({
+  willLogFor: () => false,
+  level: LoggingLevel.None,
+  info: nullLogFunc,
+  verbose: nullLogFunc,
+  error: errorFunc,
+});
+
+const errorLogger = Object.freeze({
+  willLogFor: (level: LoggingLevel) => level !== LoggingLevel.None,
+  level: LoggingLevel.None,
   info: nullLogFunc,
   verbose: nullLogFunc,
   error: errorFunc,
 });
 
 const infoLogger = Object.freeze({
+  willLogFor: (level: LoggingLevel) => {
+    return level === LoggingLevel.Info || level === LoggingLevel.Verbose;
+  },
+  level: LoggingLevel.Info,
   info: infoFunc,
   verbose: nullLogFunc,
   error: errorFunc,
 });
 
 const verboseLogger = Object.freeze({
+  willLogFor: () => true,
+  level: LoggingLevel.Verbose,
   info: infoFunc,
   verbose: verboseFunc,
   error: errorFunc,
 });
 
 const logLevelToLoggerMap = {
-  none: nullLogger,
-  info: infoLogger,
-  verbose: verboseLogger,
+  [LoggingLevel.Error]: errorLogger,
+  [LoggingLevel.None]: nullLogger,
+  [LoggingLevel.Info]: infoLogger,
+  [LoggingLevel.Verbose]: verboseLogger,
 };
 
 export const getLogger = (level: LoggingLevel): Logger => {

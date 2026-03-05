@@ -4,6 +4,9 @@ Browser Perf Logger
 0.1.2
 ---
 
+Fix error when Playwright would throw an error for fetching the size
+of a "document" request made with an empty body.
+
 Disable service workers by default in all browsers (to both ensure that
 all network requests are visible to the network logging handlers, and to
 limit "bleed" between website visits).

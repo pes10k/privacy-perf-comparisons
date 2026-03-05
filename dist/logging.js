@@ -1,6 +1,7 @@
 export var LoggingLevel;
 (function (LoggingLevel) {
     LoggingLevel["None"] = "none";
+    LoggingLevel["Error"] = "error";
     LoggingLevel["Info"] = "info";
     LoggingLevel["Verbose"] = "verbose";
 })(LoggingLevel || (LoggingLevel = {}));
@@ -41,24 +42,40 @@ const verboseFunc = baseLogFunction.bind(undefined, "VERBOSE:", false);
 const infoFunc = baseLogFunction.bind(undefined, "INFO:", false);
 const errorFunc = baseLogFunction.bind(undefined, "ERROR:", true);
 const nullLogger = Object.freeze({
+    willLogFor: () => false,
+    level: LoggingLevel.None,
+    info: nullLogFunc,
+    verbose: nullLogFunc,
+    error: errorFunc,
+});
+const errorLogger = Object.freeze({
+    willLogFor: (level) => level !== LoggingLevel.None,
+    level: LoggingLevel.None,
     info: nullLogFunc,
     verbose: nullLogFunc,
     error: errorFunc,
 });
 const infoLogger = Object.freeze({
+    willLogFor: (level) => {
+        return level === LoggingLevel.Info || level === LoggingLevel.Verbose;
+    },
+    level: LoggingLevel.Info,
     info: infoFunc,
     verbose: nullLogFunc,
     error: errorFunc,
 });
 const verboseLogger = Object.freeze({
+    willLogFor: () => true,
+    level: LoggingLevel.Verbose,
     info: infoFunc,
     verbose: verboseFunc,
     error: errorFunc,
 });
 const logLevelToLoggerMap = {
-    none: nullLogger,
-    info: infoLogger,
-    verbose: verboseLogger,
+    [LoggingLevel.Error]: errorLogger,
+    [LoggingLevel.None]: nullLogger,
+    [LoggingLevel.Info]: infoLogger,
+    [LoggingLevel.Verbose]: verboseLogger,
 };
 export const getLogger = (level) => {
     return logLevelToLoggerMap[level];
