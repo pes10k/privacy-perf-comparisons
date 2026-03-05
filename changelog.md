@@ -1,6 +1,13 @@
 Browser Perf Logger
 ===
 
+0.1.2
+---
+
+Disable service workers by default in all browsers (to both ensure that
+all network requests are visible to the network logging handlers, and to
+limit "bleed" between website visits).
+
 0.1.1
 ---
 

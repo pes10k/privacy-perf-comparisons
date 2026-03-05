@@ -68,7 +68,7 @@ const launchArgsForConfig = (config: RunConfig): PersistentLaunchOptions => {
       height: config.viewport.height,
       width: config.viewport.width,
     },
-    serviceWorkers: "allow",
+    serviceWorkers: "block",
     timeout: config.timeout * 1000,
     headless: false,
   };
@@ -93,6 +93,6 @@ export const launch = async (
   const browserType = config.browser;
   const userDataDir = config.userDataDir;
   const launchArgs = launchArgsForConfig(config);
-  logger.info("Launching browser with arguments: ", launchArgs);
+  logger.info("Launching browser with args: ", { ...launchArgs, userDataDir });
   return await getContext(browserType, userDataDir, launchArgs);
 };
