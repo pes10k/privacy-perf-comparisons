@@ -64,9 +64,7 @@ export const measureURL = async (
 
   const results = {} as Record<MeasurementType, MeasurementResult | null>;
   for (const [aMeasurementType, aMeasurer] of measurers.entries()) {
-    logger.verbose(
-      `Collecting results for measurement "${aMeasurementType}" from context`,
-    );
+    logger.verbose(`Collecting results for measurement "${aMeasurementType}"`);
     results[aMeasurementType] = await aMeasurer.collect();
   }
 

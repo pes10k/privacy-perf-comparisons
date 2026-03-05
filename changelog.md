@@ -8,6 +8,12 @@ Remove `type: MeasurementType` property on the `BaseMeasurer` class
 and its children. It was redundant with the already-existing
 `BaseMeasurer.measurementType()` method.
 
+Remove no-longer needed instrumentation method `addAutomationPageNavigation`
+(no longer needed because the page instrumenting now covers these requests).
+
+Further improve the approximation for size of headers when needing to calculate
+it directly (i.e., when playwright's `Request.sizes()` throws).
+
 0.1.2
 ---
 

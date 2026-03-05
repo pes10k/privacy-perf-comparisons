@@ -38,7 +38,7 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
     await page.waitForTimeout(eventDrainTimeMs);
     const results = {};
     for (const [aMeasurementType, aMeasurer] of measurers.entries()) {
-        logger.verbose(`Collecting results for measurement "${aMeasurementType}" from context`);
+        logger.verbose(`Collecting results for measurement "${aMeasurementType}"`);
         results[aMeasurementType] = await aMeasurer.collect();
     }
     await context.close();

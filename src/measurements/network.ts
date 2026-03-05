@@ -13,7 +13,7 @@ import { BaseMeasurer, MeasurementResult } from "./base.js";
 import { Logger, LoggingLevel } from "../logging.js";
 import { MeasurementType, Serializable, WSFrame } from "../types.js";
 
-type HTTPHeaders = Record<string, string>;
+type HTTPHeaders = { name: string; value: string }[];
 type ResourceType = string;
 type Timestamp = number;
 type URLString = string;
@@ -26,15 +26,23 @@ interface Datapoint {
 }
 
 const approxLengthOfHeaders = (headers: HTTPHeaders): number => {
-  let totalLength = 0;
-  for (const [key, value] of Object.entries(headers)) {
-    totalLength += key.length;
-    totalLength += value.length;
-    // Adding 4 here, 2 for the ": " in Header "<key>: <value>",
-    // and then 2 more for the "\r\n" after each header.
-    totalLength += 4;
-  }
-  return totalLength;
+  // Silly fudge factor, adding 4 bytes for each header; two bytes
+  // to account for the ": " in each header row like "<key>: <value>",
+  // and two bytes for the "\r\n" after each header.
+  const headersFormattingSize = headers.length * 4;
+
+  // And then use the Blob class to get the memory size for each string
+  // in the headers array. Note that we can't just use String.prototype.length
+  // because this won't account for stuff like different unicode characters
+  // using different numbers of bytes (e.g., consider a smile-y emoji with a
+  // skin tone "accent", vs the single byte needed for a string like "1").
+  //
+  // Also, bummer that typescript isn't clever enough to realize the below two
+  // lines are the same type-wise as headers.map(Object.values).flat(),
+  // but, oh well.
+  const headersStrings = headers.map((x) => Object.values(x)).flat();
+  const headersStringSize = new Blob(headersStrings).size;
+  return headersFormattingSize + headersStringSize;
 };
 
 const logSize = (
@@ -94,7 +102,7 @@ const getRequestSize = async (
 
   try {
     const bodySize = request.postDataBuffer()?.length ?? 0;
-    const headerSize = approxLengthOfHeaders(await request.allHeaders());
+    const headerSize = approxLengthOfHeaders(await request.headersArray());
     const totalSize = bodySize + headerSize;
     vLog("Request.postDataBuffer().length", bodySize, headerSize);
     return totalSize;
@@ -126,7 +134,7 @@ const getResponseSize = async (
 
   try {
     const bodySize = (await response.body()).length;
-    const headerSize = approxLengthOfHeaders(await response.allHeaders());
+    const headerSize = approxLengthOfHeaders(await response.headersArray());
     const totalSize = bodySize + headerSize;
     vLog("response.body().length", bodySize, headerSize);
     return totalSize;
@@ -266,32 +274,6 @@ class ContextNetworkLogger {
     this.#startTime = Date.now();
     this.#pageToLoggerMap = new WeakMap();
     this.#logger = logger;
-  }
-
-  // Used to record the request for thats driving a page navigation (i.e.,
-  // the initial request to start automation, caused by something like
-  // a puppeteer / playwright page.goto() call).
-  async addAutomationPageNavigation(page: Page, response: Response) {
-    if (this.isClosed()) {
-      this.#logger.error(
-        "trying to record top frame navigation, " +
-          "but measurements have been closed. " +
-          `page url="${page.url()}"`,
-      );
-      return null;
-    }
-
-    const pageMeasurements = this.#pageToLoggerMap.get(page);
-    if (!pageMeasurements) {
-      const errMsg =
-        "Page navigation for an unknown page. " + `page url="${page.url()}"`;
-      this.#logger.error(errMsg);
-      return null;
-    }
-
-    const navRequest = response.request();
-    await pageMeasurements.addRequest(navRequest);
-    await pageMeasurements.addResponse(response);
   }
 
   addWSRequest(page: Page, url: URLString, data: WSFrame): Datapoint | null {

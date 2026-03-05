@@ -14,12 +14,6 @@ export type BaseMeasurerChild = new (
   context: BrowserContext,
 ) => BaseMeasurer;
 
-export type AttachMeasurerFunc = (
-  logger: Logger,
-  url: URL,
-  context: BrowserContext,
-) => BaseMeasurer;
-
 export abstract class BaseMeasurer {
   readonly logger: Logger;
   readonly url: URL;
