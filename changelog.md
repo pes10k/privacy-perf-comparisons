@@ -1,6 +1,13 @@
 Browser Perf Logger
 ===
 
+HEAD
+---
+
+Remove `type: MeasurementType` property on the `BaseMeasurer` class
+and its children. It was redundant with the already-existing
+`BaseMeasurer.measurementType()` method.
+
 0.1.2
 ---
 

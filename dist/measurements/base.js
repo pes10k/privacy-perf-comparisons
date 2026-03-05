@@ -1,5 +1,4 @@
 export class BaseMeasurer {
-    type;
     logger;
     url;
     context;

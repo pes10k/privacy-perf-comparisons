@@ -29,7 +29,7 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
     logger.info(`Letting page load for "${String(seconds)}" seconds`);
     await page.waitForTimeout(seconds * 1000);
     for (const aMeasurer of measurers.values()) {
-        logger.verbose("Closing measurements for: ", aMeasurer.type);
+        logger.verbose("Closing measurements for: ", aMeasurer.measurementType());
         aMeasurer.close();
     }
     const eventDrainTimeMs = 5 * 1000;

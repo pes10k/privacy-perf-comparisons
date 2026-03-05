@@ -51,7 +51,7 @@ export const measureURL = async (
   await page.waitForTimeout(seconds * 1000);
 
   for (const aMeasurer of measurers.values()) {
-    logger.verbose("Closing measurements for: ", aMeasurer.type);
+    logger.verbose("Closing measurements for: ", aMeasurer.measurementType());
     aMeasurer.close();
   }
 
