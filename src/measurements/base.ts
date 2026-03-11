@@ -15,6 +15,8 @@ export type BaseMeasurerChild = new (
 ) => BaseMeasurer;
 
 export abstract class BaseMeasurer {
+  abstract readonly type: MeasurementType;
+
   readonly logger: Logger;
   readonly url: URL;
   readonly context: BrowserContext;
@@ -45,13 +47,12 @@ export abstract class BaseMeasurer {
     logFunc.call(
       this.logger,
       "MEASURER:",
-      this.measurementType().toUpperCase(),
+      this.type.toUpperCase(),
       ": ",
       ...msg,
     );
   }
 
-  abstract measurementType(): MeasurementType;
   abstract collect(): Promise<MeasurementResult | null>;
 
   instrumentContext() {
@@ -71,7 +72,7 @@ export abstract class BaseMeasurer {
   close(): boolean {
     if (this.closedAt) {
       this.logError(
-        "Tried to close measurement, but it was already " + "closed at ",
+        "Tried to close measurement, but it was already closed at ",
         this.closedAt.toISOString(),
       );
       return false;

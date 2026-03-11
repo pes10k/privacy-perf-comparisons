@@ -18,9 +18,7 @@ const injected_getPageMeasurements = () => {
     });
 };
 export class TimingMeasurer extends BaseMeasurer {
-    measurementType() {
-        return MeasurementType.Timing;
-    }
+    type = MeasurementType.Timing;
     async collect() {
         if (this.isContextClosed) {
             this.logInfo("Tried to collect results from a closed browser context");
@@ -42,7 +40,7 @@ export class TimingMeasurer extends BaseMeasurer {
             timingMeasurements.push(timingData);
         }
         return {
-            type: this.measurementType(),
+            type: this.type,
             data: timingMeasurements,
         };
     }

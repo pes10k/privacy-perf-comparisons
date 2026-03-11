@@ -60,17 +60,26 @@ const launchArgsForConfig = (config: RunConfig): PersistentLaunchOptions => {
   assert(launchArgsFunc);
   const browserArgs = launchArgsFunc(config);
 
+  // We implement *not* preserving tabs and pages that are open in the user
+  // browser state by
+  // 1. launching the browser in offline mode
+  // 2. closing any tabs and pages that are opened by the existing
+  //    user-data-dir/profile state
+  // 3. and then, enabling networking.
+  const startInOfflineMode = !config.preservePages;
+
   const defaultBrowserArgs: string[] = [];
   const launchOptions: PersistentLaunchOptions = {
     args: defaultBrowserArgs.concat(browserArgs),
     executablePath: config.binary,
+    headless: false,
+    offline: startInOfflineMode,
     screen: {
       height: config.viewport.height,
       width: config.viewport.width,
     },
     serviceWorkers: "block",
     timeout: config.timeout * 1000,
-    headless: false,
   };
 
   return launchOptions;
@@ -93,6 +102,7 @@ export const launch = async (
   const browserType = config.browser;
   const userDataDir = config.userDataDir;
   const launchArgs = launchArgsForConfig(config);
+
   logger.info("Launching browser with args: ", { ...launchArgs, userDataDir });
   return await getContext(browserType, userDataDir, launchArgs);
 };

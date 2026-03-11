@@ -8,10 +8,13 @@ export var LoggingLevel;
 const nullLogFunc = () => {
     // pass
 };
-const baseLogFunction = (prefix, isError, ...msg) => {
+const baseLogFunc = (isError, prefix, ...msg) => {
     const messageParts = [prefix];
     for (const aMsgPart of msg) {
-        if (Array.isArray(aMsgPart)) {
+        if (aMsgPart === null || aMsgPart === undefined) {
+            continue;
+        }
+        else if (Array.isArray(aMsgPart)) {
             for (const aMsg of aMsgPart) {
                 messageParts.push(String(aMsg));
             }
@@ -38,44 +41,58 @@ const baseLogFunction = (prefix, isError, ...msg) => {
         console.log(finalMessage);
     }
 };
-const verboseFunc = baseLogFunction.bind(undefined, "VERBOSE:", false);
-const infoFunc = baseLogFunction.bind(undefined, "INFO:", false);
-const errorFunc = baseLogFunction.bind(undefined, "ERROR:", true);
-const nullLogger = Object.freeze({
-    willLogFor: () => false,
-    level: LoggingLevel.None,
-    info: nullLogFunc,
-    verbose: nullLogFunc,
-    error: errorFunc,
-});
-const errorLogger = Object.freeze({
-    willLogFor: (level) => level !== LoggingLevel.None,
-    level: LoggingLevel.None,
-    info: nullLogFunc,
-    verbose: nullLogFunc,
-    error: errorFunc,
-});
-const infoLogger = Object.freeze({
-    willLogFor: (level) => {
-        return level === LoggingLevel.Info || level === LoggingLevel.Verbose;
-    },
-    level: LoggingLevel.Info,
-    info: infoFunc,
-    verbose: nullLogFunc,
-    error: errorFunc,
-});
-const verboseLogger = Object.freeze({
-    willLogFor: () => true,
-    level: LoggingLevel.Verbose,
-    info: infoFunc,
-    verbose: verboseFunc,
-    error: errorFunc,
-});
+class BaseLogger {
+    #prefix;
+    constructor(prefix) {
+        if (prefix) {
+            this.#prefix = prefix;
+        }
+    }
+    #getPrefix() {
+        return this.#prefix;
+    }
+    prefixedLogger(prefix) {
+        return new this.constructor(prefix);
+    }
+    willLogFor(level) {
+        switch (level) {
+            case LoggingLevel.None:
+                return false;
+            case LoggingLevel.Error:
+                return this.level === LoggingLevel.Error;
+            case LoggingLevel.Info:
+                return (this.level === LoggingLevel.Error || this.level === LoggingLevel.Info);
+            case LoggingLevel.Verbose:
+                return true;
+        }
+    }
+    info = baseLogFunc.bind(undefined, false, "INFO:", this.#getPrefix());
+    verbose = baseLogFunc.bind(undefined, false, "VERBOSE:", this.#getPrefix());
+    error = baseLogFunc.bind(undefined, true, "ERROR:", this.#getPrefix());
+}
+class NullLogger extends BaseLogger {
+    level = LoggingLevel.None;
+    info = nullLogFunc;
+    verbose = nullLogFunc;
+    error = nullLogFunc;
+}
+class ErrorLogger extends BaseLogger {
+    level = LoggingLevel.Error;
+    info = nullLogFunc;
+    verbose = nullLogFunc;
+}
+class InfoLogger extends BaseLogger {
+    level = LoggingLevel.Info;
+    verbose = nullLogFunc;
+}
+class VerboseLogger extends BaseLogger {
+    level = LoggingLevel.Verbose;
+}
 const logLevelToLoggerMap = {
-    [LoggingLevel.Error]: errorLogger,
-    [LoggingLevel.None]: nullLogger,
-    [LoggingLevel.Info]: infoLogger,
-    [LoggingLevel.Verbose]: verboseLogger,
+    [LoggingLevel.Error]: new ErrorLogger(),
+    [LoggingLevel.None]: new NullLogger(),
+    [LoggingLevel.Info]: new InfoLogger(),
+    [LoggingLevel.Verbose]: new VerboseLogger(),
 };
 export const getLogger = (level) => {
     return logLevelToLoggerMap[level];

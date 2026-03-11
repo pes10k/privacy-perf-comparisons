@@ -9,11 +9,12 @@ export type WSFrame = string | Buffer;
 export type Serializable = unknown;
 
 export interface PersistentLaunchOptions extends LaunchOptions {
-  serviceWorkers?: "allow" | "block";
+  offline: boolean;
   screen?: {
     height: number;
     width: number;
   };
+  serviceWorkers?: "allow" | "block";
 }
 
 export enum BrowserType {
@@ -24,6 +25,7 @@ export enum BrowserType {
 }
 
 export enum MeasurementType {
+  Memory = "memory",
   Network = "network",
   Timing = "timing",
 }
@@ -41,6 +43,7 @@ export interface RunConfig {
   loggingLevel: LoggingLevel;
   measurements: MeasurementType[];
   output: Writable;
+  preservePages: boolean;
   profile?: string;
   seconds: number;
   timeout: number;

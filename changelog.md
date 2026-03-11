@@ -1,7 +1,7 @@
 Browser Perf Logger
 ===
 
-HEAD
+0.2.0
 ---
 
 Remove `type: MeasurementType` property on the `BaseMeasurer` class
@@ -13,6 +13,13 @@ Remove no-longer needed instrumentation method `addAutomationPageNavigation`
 
 Further improve the approximation for size of headers when needing to calculate
 it directly (i.e., when playwright's `Request.sizes()` throws).
+
+By default close all pages from previous session (and prevent them from
+touching network). To keep previous behavior (i.e., maintain and open
+all pages from the previous session) use `--preserve-pages`.
+
+Add `Logger.prefixedLogger()` method to make it easier and more consistent
+to create scoped log messages.
 
 0.1.2
 ---

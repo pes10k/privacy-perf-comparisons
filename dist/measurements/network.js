@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { BaseMeasurer } from "./base.js";
 import { LoggingLevel } from "../logging.js";
 import { MeasurementType } from "../types.js";
+// This is only an approximation for a bunch of reasons, including
+// differences in string encoding, and normalization that the browsers,
+// playwright, puppeteer/webdriver-bidi, and other things in the stack does
+// for the underlying data.
 const approxLengthOfHeaders = (headers) => {
     // Silly fudge factor, adding 4 bytes for each header; two bytes
     // to account for the ": " in each header row like "<key>: <value>",
@@ -272,13 +276,11 @@ class ContextNetworkLogger {
     }
 }
 export class NetworkMeasurer extends BaseMeasurer {
+    type = MeasurementType.Network;
     #netLogger;
     constructor(logger, url, context) {
         super(logger, url, context);
         this.#netLogger = new ContextNetworkLogger(logger);
-    }
-    measurementType() {
-        return MeasurementType.Network;
     }
     #instrumentPage(page) {
         this.#netLogger.notePage(page);
@@ -320,7 +322,7 @@ export class NetworkMeasurer extends BaseMeasurer {
     async collect() {
         this.closeIfOpen();
         return {
-            type: this.measurementType(),
+            type: this.type,
             data: this.#netLogger.toJSON(),
         };
     }

@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace, } from "argparse";
 import { launch } from "./browser.js";
-import { defaultArgs, runConfigForArgs } from "./config.js";
+import { defaultLaunchArgs, runConfigForArgs } from "./config.js";
 import { getLogger, LoggingLevel } from "./logging.js";
 import { measureURL } from "./measure.js";
 import { BrowserType, MeasurementType } from "./types.js";
+const packageText = readFileSync("./package.json", "utf8");
+assert(typeof packageText === "string");
+const packageData = JSON.parse(packageText);
+const packageVersion = packageData.version;
+assert(packageVersion);
 const isDebugMode = process.env.PERF_TESTS_DEBUG === "1";
+const defaultArgs = defaultLaunchArgs();
 const parser = new ArgumentParser({
     description: "Run performance tests for a playwright version of a browser.",
     formatter_class: ArgumentDefaultsHelpFormatter,
 });
 parser.add_argument("-b", "--browser", {
     choices: Object.values(BrowserType),
-    default: BrowserType.Brave,
+    default: defaultArgs.browser,
     help: "Which browser family to use for this test.",
 });
 parser.add_argument("-d", "--user-data-dir", {
@@ -28,13 +35,13 @@ parser.add_argument("-d", "--user-data-dir", {
 });
 parser.add_argument("-l", "--logging", {
     choices: Object.values(LoggingLevel),
-    default: LoggingLevel.Info,
+    default: defaultArgs.loggingLevel,
     help: "What level of information to include when printing information during " +
         "the measurement.",
 });
 parser.add_argument("-m", "--measurements", {
     choices: Object.values(MeasurementType),
-    default: Object.values(MeasurementType),
+    default: defaultArgs.measurements,
     help: "Which measurements of performance to collect. By default, performs all " +
         "measurements.",
     nargs: "+",
@@ -52,6 +59,14 @@ parser.add_argument("-p", "--profile", {
     default: defaultArgs.profile,
     help: "For Chromium, this is the name of the profile in an existing " +
         "--user-data-dir directory to load. (Only used for Chromium browsers)",
+});
+parser.add_argument("-r", "--preserve-pages", {
+    action: "store_true",
+    default: defaultArgs.preservePages,
+    help: "Preserve and reopen any pages and tabs that are set as open in the " +
+        "specified --user-data-dir (if any). By default the tool will prevent " +
+        "any pages from being automatically opened, but if this argument is set, " +
+        "then any existing pages will be reopened before taking any measurements.",
 });
 parser.add_argument("-s", "--seconds", {
     default: defaultArgs.seconds,
@@ -71,6 +86,10 @@ parser.add_argument("-u", "--url", {
     required: true,
     type: URL,
 });
+parser.add_argument("-v", "--version", {
+    action: "version",
+    version: packageVersion,
+});
 parser.add_argument("-x", "--binary-path", {
     help: "Path to the browser binary to run the measurements with. Note that " +
         "this argument is only valid for Chromium-family browsers, since " +
@@ -78,12 +97,12 @@ parser.add_argument("-x", "--binary-path", {
         "while the gecko and webkit ones do.",
 });
 parser.add_argument("--height", {
-    default: defaultArgs.viewport.height,
+    default: defaultArgs.viewport?.height,
     help: "The height of the browser viewport to use when loading pages.",
     type: "int",
 });
 parser.add_argument("--width", {
-    default: defaultArgs.viewport.width,
+    default: defaultArgs.viewport?.width,
     help: "The width of the browser viewport to use when loading pages.",
     type: "int",
 });
@@ -91,10 +110,11 @@ try {
     const rawArgs = parser.parse_args();
     assert(rawArgs instanceof Namespace);
     const runConfig = await runConfigForArgs(rawArgs);
-    const { measurements, url, seconds, timeout, loggingLevel } = runConfig;
+    const { measurements, url, seconds, timeout } = runConfig;
+    const { loggingLevel, preservePages } = runConfig;
     const logger = getLogger(loggingLevel);
     const browserContext = await launch(logger, runConfig);
-    const results = await measureURL(logger, browserContext, url, seconds, timeout, measurements);
+    const results = await measureURL(logger, browserContext, url, seconds, timeout, measurements, preservePages);
     runConfig.output.write(JSON.stringify(results));
     process.exit(0);
 }

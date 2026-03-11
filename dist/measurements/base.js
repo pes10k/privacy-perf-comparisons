@@ -20,7 +20,7 @@ export class BaseMeasurer {
         this.#log(this.logger.error, ...msg);
     }
     #log(logFunc, ...msg) {
-        logFunc.call(this.logger, "MEASURER:", this.measurementType().toUpperCase(), ": ", ...msg);
+        logFunc.call(this.logger, "MEASURER:", this.type.toUpperCase(), ": ", ...msg);
     }
     instrumentContext() {
         this.context.on("close", () => {
@@ -34,7 +34,7 @@ export class BaseMeasurer {
     }
     close() {
         if (this.closedAt) {
-            this.logError("Tried to close measurement, but it was already " + "closed at ", this.closedAt.toISOString());
+            this.logError("Tried to close measurement, but it was already closed at ", this.closedAt.toISOString());
             return false;
         }
         this.closeIfOpen();

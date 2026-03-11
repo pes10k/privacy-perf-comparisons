@@ -25,6 +25,10 @@ interface Datapoint {
   url: URLString;
 }
 
+// This is only an approximation for a bunch of reasons, including
+// differences in string encoding, and normalization that the browsers,
+// playwright, puppeteer/webdriver-bidi, and other things in the stack does
+// for the underlying data.
 const approxLengthOfHeaders = (headers: HTTPHeaders): number => {
   // Silly fudge factor, adding 4 bytes for each header; two bytes
   // to account for the ": " in each header row like "<key>: <value>",
@@ -350,15 +354,12 @@ class ContextNetworkLogger {
 }
 
 export class NetworkMeasurer extends BaseMeasurer {
+  readonly type = MeasurementType.Network;
   readonly #netLogger: ContextNetworkLogger;
 
   constructor(logger: Logger, url: URL, context: BrowserContext) {
     super(logger, url, context);
     this.#netLogger = new ContextNetworkLogger(logger);
-  }
-
-  measurementType(): MeasurementType {
-    return MeasurementType.Network;
   }
 
   #instrumentPage(page: Page) {
@@ -407,7 +408,7 @@ export class NetworkMeasurer extends BaseMeasurer {
   async collect(): Promise<MeasurementResult | null> {
     this.closeIfOpen();
     return {
-      type: this.measurementType(),
+      type: this.type,
       data: this.#netLogger.toJSON(),
     };
   }

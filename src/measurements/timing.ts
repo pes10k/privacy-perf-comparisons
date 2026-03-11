@@ -22,9 +22,7 @@ const injected_getPageMeasurements = (): Promise<Serializable> => {
 };
 
 export class TimingMeasurer extends BaseMeasurer {
-  measurementType(): MeasurementType {
-    return MeasurementType.Timing;
-  }
+  readonly type = MeasurementType.Timing;
 
   async collect(): Promise<MeasurementResult | null> {
     if (this.isContextClosed) {
@@ -50,7 +48,7 @@ export class TimingMeasurer extends BaseMeasurer {
     }
 
     return {
-      type: this.measurementType(),
+      type: this.type,
       data: timingMeasurements,
     };
   }

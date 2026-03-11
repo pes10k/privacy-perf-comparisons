@@ -1,14 +1,13 @@
+export type LogFunc = (...msg: unknown[]) => void;
 export enum LoggingLevel {
   None = "none",
   Error = "error",
   Info = "info",
   Verbose = "verbose",
 }
-
-export type LogFunc = (...msg: unknown[]) => void;
-
 export interface Logger {
   willLogFor: (level: LoggingLevel) => boolean;
+  prefixedLogger: (prefix: string) => Logger;
   level: LoggingLevel;
   info: LogFunc;
   verbose: LogFunc;
@@ -19,14 +18,16 @@ const nullLogFunc = () => {
   // pass
 };
 
-const baseLogFunction = (
-  prefix: string,
+const baseLogFunc = (
   isError: boolean,
+  prefix: string,
   ...msg: unknown[]
 ): void => {
   const messageParts = [prefix];
   for (const aMsgPart of msg) {
-    if (Array.isArray(aMsgPart)) {
+    if (aMsgPart === null || aMsgPart === undefined) {
+      continue;
+    } else if (Array.isArray(aMsgPart)) {
       for (const aMsg of aMsgPart) {
         messageParts.push(String(aMsg));
       }
@@ -43,7 +44,6 @@ const baseLogFunction = (
   }
 
   const finalMessage = messageParts.join("");
-
   if (isError) {
     console.error(finalMessage);
   } else {
@@ -51,49 +51,73 @@ const baseLogFunction = (
   }
 };
 
-const verboseFunc = baseLogFunction.bind(undefined, "VERBOSE:", false);
-const infoFunc = baseLogFunction.bind(undefined, "INFO:", false);
-const errorFunc = baseLogFunction.bind(undefined, "ERROR:", true);
+abstract class BaseLogger {
+  abstract readonly level: LoggingLevel;
+  readonly #prefix: string | undefined;
 
-const nullLogger = Object.freeze({
-  willLogFor: () => false,
-  level: LoggingLevel.None,
-  info: nullLogFunc,
-  verbose: nullLogFunc,
-  error: errorFunc,
-});
+  constructor(prefix?: string) {
+    if (prefix) {
+      this.#prefix = prefix;
+    }
+  }
 
-const errorLogger = Object.freeze({
-  willLogFor: (level: LoggingLevel) => level !== LoggingLevel.None,
-  level: LoggingLevel.None,
-  info: nullLogFunc,
-  verbose: nullLogFunc,
-  error: errorFunc,
-});
+  #getPrefix(): string | undefined {
+    return this.#prefix;
+  }
 
-const infoLogger = Object.freeze({
-  willLogFor: (level: LoggingLevel) => {
-    return level === LoggingLevel.Info || level === LoggingLevel.Verbose;
-  },
-  level: LoggingLevel.Info,
-  info: infoFunc,
-  verbose: nullLogFunc,
-  error: errorFunc,
-});
+  prefixedLogger(prefix: string): BaseLogger {
+    return new (this.constructor as new (prefix?: string) => BaseLogger)(
+      prefix,
+    );
+  }
 
-const verboseLogger = Object.freeze({
-  willLogFor: () => true,
-  level: LoggingLevel.Verbose,
-  info: infoFunc,
-  verbose: verboseFunc,
-  error: errorFunc,
-});
+  willLogFor(level: LoggingLevel): boolean {
+    switch (level) {
+      case LoggingLevel.None:
+        return false;
+      case LoggingLevel.Error:
+        return this.level === LoggingLevel.Error;
+      case LoggingLevel.Info:
+        return (
+          this.level === LoggingLevel.Error || this.level === LoggingLevel.Info
+        );
+      case LoggingLevel.Verbose:
+        return true;
+    }
+  }
+
+  info = baseLogFunc.bind(undefined, false, "INFO:", this.#getPrefix());
+  verbose = baseLogFunc.bind(undefined, false, "VERBOSE:", this.#getPrefix());
+  error = baseLogFunc.bind(undefined, true, "ERROR:", this.#getPrefix());
+}
+
+class NullLogger extends BaseLogger {
+  level = LoggingLevel.None;
+  info = nullLogFunc;
+  verbose = nullLogFunc;
+  error = nullLogFunc;
+}
+
+class ErrorLogger extends BaseLogger {
+  level = LoggingLevel.Error;
+  info = nullLogFunc;
+  verbose = nullLogFunc;
+}
+
+class InfoLogger extends BaseLogger {
+  level = LoggingLevel.Info;
+  verbose = nullLogFunc;
+}
+
+class VerboseLogger extends BaseLogger {
+  level = LoggingLevel.Verbose;
+}
 
 const logLevelToLoggerMap = {
-  [LoggingLevel.Error]: errorLogger,
-  [LoggingLevel.None]: nullLogger,
-  [LoggingLevel.Info]: infoLogger,
-  [LoggingLevel.Verbose]: verboseLogger,
+  [LoggingLevel.Error]: new ErrorLogger(),
+  [LoggingLevel.None]: new NullLogger(),
+  [LoggingLevel.Info]: new InfoLogger(),
+  [LoggingLevel.Verbose]: new VerboseLogger(),
 };
 
 export const getLogger = (level: LoggingLevel): Logger => {

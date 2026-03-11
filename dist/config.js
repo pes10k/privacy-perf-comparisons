@@ -8,14 +8,20 @@ import { getLogger, LoggingLevel } from "./logging.js";
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
-export const defaultArgs = {
-    profile: "Default",
-    seconds: 30,
-    timeout: 30,
-    viewport: {
-        height: 1024,
-        width: 1280,
-    },
+export const defaultLaunchArgs = () => {
+    return {
+        browser: BrowserType.Chromium,
+        loggingLevel: LoggingLevel.Info,
+        measurements: [MeasurementType.Network, MeasurementType.Timing],
+        preservePages: false,
+        profile: "Default",
+        seconds: 30,
+        timeout: 30,
+        viewport: {
+            height: 1024,
+            width: 1280,
+        },
+    };
 };
 const _fileCheck = async (mode, ...segments) => {
     try {
@@ -149,13 +155,8 @@ export const runConfigForArgs = async (args) => {
         throw new Error('Invalid "seconds". Must be a positive integer.');
     }
     const isChromium = args.browser === BrowserType.Chromium || args.browser === BrowserType.Brave;
-    let userDataDir;
-    if (typeof args.user_data_dir === "string") {
-        userDataDir = args.user_data_dir;
-    }
     assert(typeof args.profile === "string");
-    if (args.browser === BrowserType.Gecko &&
-        args.profile !== defaultArgs.profile) {
+    if (args.browser === BrowserType.Gecko && args.profile !== args.profile) {
         throw new Error("Cannot use different profiles within the same profile " +
             "directory for Gecko browsers. Use --user-data-dir to use different " +
             "browser configurations for gecko browsers (instead of multiple " +
@@ -180,17 +181,21 @@ export const runConfigForArgs = async (args) => {
     // Any case other than one of the above cases is an error.
     // This is not the most concise way to check these cases, but meant
     // to be the easiest to follow, by matching the above exact criteria
+    let userDataDirArg;
+    if (typeof args.user_data_dir === "string") {
+        userDataDirArg = args.user_data_dir;
+    }
     let isUserDataDirExisting;
     let isProfileReadable;
-    if (!userDataDir) {
+    if (!userDataDirArg) {
         isUserDataDirExisting = false;
         isProfileReadable = false;
     }
-    else if (await isPathToReadableDir(userDataDir)) {
+    else if (await isPathToReadableDir(userDataDirArg)) {
         isUserDataDirExisting = true;
-        isProfileReadable = await isPathToReadableDir(userDataDir, args.profile);
+        isProfileReadable = await isPathToReadableDir(userDataDirArg, args.profile);
     }
-    const isCaseOne = !userDataDir;
+    const isCaseOne = !userDataDirArg;
     const isCaseTwo = !isCaseOne && !isUserDataDirExisting;
     const isCaseThree = !isCaseOne && !isCaseTwo && !isChromium && isUserDataDirExisting;
     const isCaseFour = !isCaseOne &&
@@ -207,22 +212,22 @@ export const runConfigForArgs = async (args) => {
         logMsg("\t", "- creating temporary user-data dir: ", validatedUserDataDir);
     }
     else if (isCaseTwo) {
-        validatedUserDataDir = userDataDir;
+        validatedUserDataDir = userDataDirArg;
         logMsg("\t", "- creating new user-data dir: ", validatedUserDataDir);
     }
     else if (isCaseThree) {
-        validatedUserDataDir = userDataDir;
+        validatedUserDataDir = userDataDirArg;
         logMsg("\t", "- using existing user-data dir: ", validatedUserDataDir);
     }
     else if (isCaseFour) {
-        assert(userDataDir);
-        validatedUserDataDir = join(userDataDir, args.profile);
+        assert(userDataDirArg);
+        validatedUserDataDir = join(userDataDirArg, args.profile);
         validatedProfile = args.profile;
         logMsg("\t", "- using user-data dir: ", validatedUserDataDir);
         logMsg("\t", "- with profile name: ", args.profile);
     }
     else {
-        throw new Error("Invalid user-data-dir config.  Either must specify no " +
+        throw new Error("Invalid --user-data-dir config.  Either must specify no " +
             "user-data-dir, or a user-data-dir argument for a directory that " +
             "does not currently exist, or specify a valid user-data-dir (with " +
             "the specified profile as a subdirectory in the user-data-dir if " +
@@ -311,12 +316,15 @@ export const runConfigForArgs = async (args) => {
     assert(!args.output || typeof args.output === "string");
     const outputPath = args.output;
     const outputHandle = await handleForResults(outputPath, args.url);
+    assert(typeof args.preserve_pages === "boolean");
+    const preservePages = args.preserve_pages;
     return {
         binary: binaryPath,
         browser: browserType,
         loggingLevel: loggingLevel,
         measurements: mesToPerform,
         output: outputHandle,
+        preservePages: preservePages,
         profile: validatedProfile,
         seconds: args.seconds,
         timeout: args.timeout,

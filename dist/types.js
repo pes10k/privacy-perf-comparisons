@@ -7,6 +7,7 @@ export var BrowserType;
 })(BrowserType || (BrowserType = {}));
 export var MeasurementType;
 (function (MeasurementType) {
+    MeasurementType["Memory"] = "memory";
     MeasurementType["Network"] = "network";
     MeasurementType["Timing"] = "timing";
 })(MeasurementType || (MeasurementType = {}));
