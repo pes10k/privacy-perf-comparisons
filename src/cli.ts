@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import {
   ArgumentParser,
@@ -9,16 +8,10 @@ import {
 } from "argparse";
 
 import { launch } from "./browser.js";
-import { defaultLaunchArgs, runConfigForArgs } from "./config.js";
+import { defaultLaunchArgs, getVersion, runConfigForArgs } from "./config.js";
 import { getLogger, LoggingLevel } from "./logging.js";
 import { measureURL } from "./measure.js";
 import { BrowserType, MeasurementType } from "./types.js";
-
-const packageText: string = readFileSync("./package.json", "utf8");
-assert(typeof packageText === "string");
-const packageData = JSON.parse(packageText) as { version: string };
-const packageVersion: string = packageData.version;
-assert(packageVersion);
 
 const isDebugMode = process.env.PERF_TESTS_DEBUG === "1";
 const defaultArgs = defaultLaunchArgs();
@@ -105,7 +98,7 @@ parser.add_argument("-u", "--url", {
 });
 parser.add_argument("-v", "--version", {
   action: "version",
-  version: packageVersion,
+  version: await getVersion(),
 });
 parser.add_argument("-x", "--binary-path", {
   help:

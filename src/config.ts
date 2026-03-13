@@ -4,6 +4,7 @@ import {
   constants,
   mkdtempDisposable,
   open,
+  readFile,
   stat,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,12 +14,32 @@ import { Writable } from "node:stream";
 import { Namespace } from "argparse";
 import { chromium, firefox, webkit } from "playwright";
 
-import { BrowserType, MeasurementType, Path, RunConfig } from "./types.js";
+import {
+  BrowserType,
+  MeasurementType,
+  Path,
+  RunConfig,
+  VersionNumber,
+} from "./types.js";
 import { getLogger, LoggingLevel } from "./logging.js";
 
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
+
+let cachedVersion: undefined | VersionNumber;
+export const getVersion = async (): Promise<VersionNumber> => {
+  if (cachedVersion !== undefined) {
+    return cachedVersion;
+  }
+  const packageText: string = await readFile("./package.json", "utf8");
+  assert(typeof packageText === "string");
+  const packageData = JSON.parse(packageText) as { version: string };
+  const packageVersion: VersionNumber = packageData.version;
+  assert(packageVersion);
+  cachedVersion = packageVersion;
+  return cachedVersion;
+};
 
 export const defaultLaunchArgs = (): Partial<RunConfig> => {
   return {
@@ -30,13 +51,13 @@ export const defaultLaunchArgs = (): Partial<RunConfig> => {
     seconds: 30,
     timeout: 30,
     viewport: {
-      height: 1024,
+      height: 720,
       width: 1280,
     },
   };
 };
 
-const _fileCheck = async (
+const fileCheck = async (
   mode: number,
   ...segments: Path[]
 ): Promise<boolean> => {
@@ -62,7 +83,7 @@ const isPathToReadableDir = async (...segments: Path[]): Promise<boolean> => {
   if (!isPathADir) {
     return false;
   }
-  return await _fileCheck(R_OK, ...segments);
+  return await fileCheck(R_OK, ...segments);
 };
 
 const isPathToWriteableDir = async (...segments: Path[]): Promise<boolean> => {
@@ -70,7 +91,7 @@ const isPathToWriteableDir = async (...segments: Path[]): Promise<boolean> => {
   if (!isPathADir) {
     return false;
   }
-  return await _fileCheck(W_OK | X_OK, ...segments);
+  return await fileCheck(W_OK | X_OK, ...segments);
 };
 
 const isPathToFile = async (...segments: Path[]): Promise<boolean> => {
@@ -83,7 +104,7 @@ const isPathToFile = async (...segments: Path[]): Promise<boolean> => {
 };
 
 const isPathToExecFile = async (...segments: Path[]): Promise<boolean> => {
-  return await _fileCheck(X_OK, ...segments);
+  return await fileCheck(X_OK, ...segments);
 };
 
 const isPathToWritableFile = async (...segments: Path[]): Promise<boolean> => {
@@ -91,7 +112,7 @@ const isPathToWritableFile = async (...segments: Path[]): Promise<boolean> => {
   if (!isPathFile) {
     return false;
   }
-  return await _fileCheck(W_OK, ...segments);
+  return await fileCheck(W_OK, ...segments);
 };
 
 const makeResultFilename = async (dir: Path, url: URL): Promise<Path> => {
@@ -171,10 +192,9 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   const loggingLevel = args.logging as LoggingLevel;
   assert(Object.values(LoggingLevel).includes(loggingLevel));
   const logger = getLogger(loggingLevel);
-  const logMsg = (...args: unknown[]): void => {
-    logger.verbose("Config Validation: ", ...args);
-  };
-  logMsg("Raw arguments=", args);
+
+  const log = logger.prefixedLogger("Config Validation: ");
+  log.verbose("Raw arguments=", args);
 
   assert(args.url instanceof URL);
   if (!validSchemes.includes(args.url.protocol)) {
@@ -258,23 +278,23 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     isProfileReadable;
 
   let validatedUserDataDir, validatedProfile;
-  logMsg("--user-data-dir validation");
+  log.verbose("--user-data-dir validation");
   if (isCaseOne) {
     const tempDirPath = await mkdtempDisposable(join(tmpdir(), programName));
     validatedUserDataDir = tempDirPath.path;
-    logMsg("\t", "- creating temporary user-data dir: ", validatedUserDataDir);
+    log.verbose("\t", "- creating temp user-data dir: ", validatedUserDataDir);
   } else if (isCaseTwo) {
     validatedUserDataDir = userDataDirArg;
-    logMsg("\t", "- creating new user-data dir: ", validatedUserDataDir);
+    log.verbose("\t", "- creating new user-data dir: ", validatedUserDataDir);
   } else if (isCaseThree) {
     validatedUserDataDir = userDataDirArg;
-    logMsg("\t", "- using existing user-data dir: ", validatedUserDataDir);
+    log.verbose("\t", "- using existing user-data dir: ", validatedUserDataDir);
   } else if (isCaseFour) {
     assert(userDataDirArg);
     validatedUserDataDir = join(userDataDirArg, args.profile);
     validatedProfile = args.profile;
-    logMsg("\t", "- using user-data dir: ", validatedUserDataDir);
-    logMsg("\t", "- with profile name: ", args.profile);
+    log.verbose("\t", "- using user-data dir: ", validatedUserDataDir);
+    log.verbose("\t", "- with profile name: ", args.profile);
   } else {
     throw new Error(
       "Invalid --user-data-dir config.  Either must specify no " +

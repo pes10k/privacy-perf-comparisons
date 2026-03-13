@@ -74,7 +74,7 @@ const launchArgsForConfig = (config: RunConfig): PersistentLaunchOptions => {
     executablePath: config.binary,
     headless: false,
     offline: startInOfflineMode,
-    screen: {
+    viewport: {
       height: config.viewport.height,
       width: config.viewport.width,
     },

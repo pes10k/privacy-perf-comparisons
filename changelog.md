@@ -1,6 +1,15 @@
 Browser Perf Logger
 ===
 
+0.2.1
+---
+
+Correct error where arguments for configuring the browser's screen and viewport
+were treated as synonyms (instead of the correct use of those parameters, where
+the "screen" values are determined by the viewport arguments).
+
+Add "version" number to reports.
+
 0.2.0
 ---
 

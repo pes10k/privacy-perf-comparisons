@@ -5,12 +5,13 @@ import { LaunchOptions } from "playwright";
 import { LoggingLevel } from "./logging.js";
 
 export type Path = string;
-export type WSFrame = string | Buffer;
 export type Serializable = unknown;
+export type VersionNumber = string;
+export type WSFrame = string | Buffer;
 
 export interface PersistentLaunchOptions extends LaunchOptions {
   offline: boolean;
-  screen?: {
+  viewport?: {
     height: number;
     width: number;
   };
@@ -34,6 +35,7 @@ export interface Report {
   url: URL;
   start: Date;
   end: Date;
+  version: VersionNumber;
   measurements: Record<MeasurementType, unknown>;
 }
 

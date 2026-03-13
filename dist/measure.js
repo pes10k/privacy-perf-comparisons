@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getVersion } from "./config.js";
 import { MemoryMeasurer } from "./measurements/memory.js";
 import { NetworkMeasurer } from "./measurements/network.js";
 import { TimingMeasurer } from "./measurements/timing.js";
@@ -67,6 +68,7 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
         measurements: results,
         start: startTime,
         url: url,
+        version: await getVersion(),
     };
 };
 //# sourceMappingURL=measure.js.map

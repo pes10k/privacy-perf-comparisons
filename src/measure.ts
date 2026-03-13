@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import { BrowserContext } from "@playwright/test";
 
+import { getVersion } from "./config.js";
 import { Logger } from "./logging.js";
 import {
   BaseMeasurer,
@@ -97,5 +98,6 @@ export const measureURL = async (
     measurements: results,
     start: startTime,
     url: url,
+    version: await getVersion(),
   };
 };
