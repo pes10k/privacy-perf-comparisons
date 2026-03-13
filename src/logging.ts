@@ -61,10 +61,6 @@ abstract class BaseLogger {
     }
   }
 
-  #getPrefix(): string | undefined {
-    return this.#prefix;
-  }
-
   prefixedLogger(prefix: string): BaseLogger {
     return new (this.constructor as new (prefix?: string) => BaseLogger)(
       prefix,
@@ -86,9 +82,17 @@ abstract class BaseLogger {
     }
   }
 
-  info = baseLogFunc.bind(undefined, false, "INFO:", this.#getPrefix());
-  verbose = baseLogFunc.bind(undefined, false, "VERBOSE:", this.#getPrefix());
-  error = baseLogFunc.bind(undefined, true, "ERROR:", this.#getPrefix());
+  info(...msg: unknown[]): void {
+    baseLogFunc(false, "INFO:", this.#prefix, ...msg);
+  }
+
+  verbose(...msg: unknown[]): void {
+    baseLogFunc(false, "VERBOSE:", this.#prefix, ...msg);
+  }
+
+  error(...msg: unknown[]): void {
+    baseLogFunc(true, "ERROR:", this.#prefix, ...msg);
+  }
 }
 
 class NullLogger extends BaseLogger {

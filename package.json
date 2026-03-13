@@ -1,6 +1,6 @@
 {
   "name": "browser-perf-logger",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Automated, cross-browser measurements of performance.",
   "license": "ISC",
   "author": "Peter Snyder <pes@brave.com>",

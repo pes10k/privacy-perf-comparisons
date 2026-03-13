@@ -37,6 +37,14 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
         log.verbose("Instrumenting context for measurement: ", aMeasurementType);
         measurers.set(aMeasurementType, aMeasurer);
     }
+    // Triggering beforeStart lifetime event for all measurements
+    for (const aMeasurer of measurers.values()) {
+        await aMeasurer.beforeStart();
+    }
+    // And now triggering "start" event for all measurements
+    for (const aMeasurer of measurers.values()) {
+        aMeasurer.start();
+    }
     log.verbose("Creating empty page (i.e., new tab).");
     const page = await context.newPage();
     const startTime = new Date();
@@ -58,10 +66,15 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
         "complete. (Note, they are not include in measurement amounts)");
     await page.waitForTimeout(eventDrainTimeMs);
     const results = {};
+    const numMeasurements = measurers.size.toString();
+    let measurementIndex = 0;
     for (const [aMeasurementType, aMeasurer] of measurers.entries()) {
-        log.verbose(`Collecting results for measurement "${aMeasurementType}"`);
+        measurementIndex += 1;
+        const prefix = `(${measurementIndex.toString()}/${numMeasurements}) `;
+        log.info(prefix, `Collecting measurement "${aMeasurementType}"`);
         results[aMeasurementType] = await aMeasurer.collect();
     }
+    log.info("closing browser");
     await context.close();
     return {
         end: new Date(),

@@ -25,7 +25,7 @@ export const defaultLaunchArgs = () => {
     return {
         browser: BrowserType.Chromium,
         loggingLevel: LoggingLevel.Info,
-        measurements: [MeasurementType.Network, MeasurementType.Timing],
+        measurements: Object.values(MeasurementType),
         preservePages: false,
         profile: "Default",
         seconds: 30,
@@ -151,7 +151,7 @@ export const runConfigForArgs = async (args) => {
     const loggingLevel = args.logging;
     assert(Object.values(LoggingLevel).includes(loggingLevel));
     const logger = getLogger(loggingLevel);
-    const log = logger.prefixedLogger("Config Validation: ");
+    const log = logger.prefixedLogger("runConfigForArgs(): ");
     log.verbose("Raw arguments=", args);
     assert(args.url instanceof URL);
     if (!validSchemes.includes(args.url.protocol)) {

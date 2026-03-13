@@ -55,6 +55,23 @@ export abstract class BaseMeasurer {
 
   abstract collect(): Promise<MeasurementResult | null>;
 
+  // Method thats called on all base classes after the browser is setup
+  // and prepared an its initial state, meaning its its loaded, and (unless
+  // --preserve-page has been specified) all tabs and pages have been closed.
+  // Child classes can implement this if there is some behavior they need
+  // to do *before* we start loading the target URL for the page measurement.
+  async beforeStart(): Promise<undefined> {
+    // pass
+  }
+
+  // Method thats called on all base classes indicating that we've started
+  // loading the target page. Everything that happens between this method
+  // being called, and the "close" method being called is happening
+  // while the target webpage is being loaded and executed.
+  start(): undefined {
+    // pass
+  }
+
   instrumentContext() {
     this.context.on("close", () => {
       this.isContextClosed = true;

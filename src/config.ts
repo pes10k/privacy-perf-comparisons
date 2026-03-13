@@ -45,7 +45,7 @@ export const defaultLaunchArgs = (): Partial<RunConfig> => {
   return {
     browser: BrowserType.Chromium,
     loggingLevel: LoggingLevel.Info,
-    measurements: [MeasurementType.Network, MeasurementType.Timing],
+    measurements: Object.values(MeasurementType),
     preservePages: false,
     profile: "Default",
     seconds: 30,
@@ -193,7 +193,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   assert(Object.values(LoggingLevel).includes(loggingLevel));
   const logger = getLogger(loggingLevel);
 
-  const log = logger.prefixedLogger("Config Validation: ");
+  const log = logger.prefixedLogger("runConfigForArgs(): ");
   log.verbose("Raw arguments=", args);
 
   assert(args.url instanceof URL);

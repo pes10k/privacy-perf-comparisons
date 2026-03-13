@@ -1,6 +1,11 @@
 Browser Perf Logger
 ===
 
+0.2.2
+---
+
+Add "memory" measurement option.
+
 0.2.1
 ---
 

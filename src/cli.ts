@@ -125,7 +125,7 @@ try {
   const runConfig = await runConfigForArgs(rawArgs);
   const { measurements, url, seconds, timeout } = runConfig;
   const { loggingLevel, preservePages } = runConfig;
-  const logger = getLogger(loggingLevel);
+  const logger = getLogger(isDebugMode ? LoggingLevel.Verbose : loggingLevel);
   const browserContext = await launch(logger, runConfig);
   const results = await measureURL(
     logger,

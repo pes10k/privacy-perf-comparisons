@@ -48,9 +48,6 @@ class BaseLogger {
             this.#prefix = prefix;
         }
     }
-    #getPrefix() {
-        return this.#prefix;
-    }
     prefixedLogger(prefix) {
         return new this.constructor(prefix);
     }
@@ -66,9 +63,15 @@ class BaseLogger {
                 return true;
         }
     }
-    info = baseLogFunc.bind(undefined, false, "INFO:", this.#getPrefix());
-    verbose = baseLogFunc.bind(undefined, false, "VERBOSE:", this.#getPrefix());
-    error = baseLogFunc.bind(undefined, true, "ERROR:", this.#getPrefix());
+    info(...msg) {
+        baseLogFunc(false, "INFO:", this.#prefix, ...msg);
+    }
+    verbose(...msg) {
+        baseLogFunc(false, "VERBOSE:", this.#prefix, ...msg);
+    }
+    error(...msg) {
+        baseLogFunc(true, "ERROR:", this.#prefix, ...msg);
+    }
 }
 class NullLogger extends BaseLogger {
     level = LoggingLevel.None;
