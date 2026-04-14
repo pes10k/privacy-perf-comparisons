@@ -107,6 +107,7 @@ parser.add_argument("-x", "--binary-path", {
     "Chromium family browsers do not require any playwright patches, " +
     "while the gecko and webkit ones do.",
 });
+
 parser.add_argument("--height", {
   default: defaultArgs.viewport?.height,
   help: "The height of the browser viewport to use when loading pages.",
@@ -137,8 +138,9 @@ try {
     preservePages,
   );
 
-  runConfig.output.write(JSON.stringify(results));
-  process.exit(0);
+  runConfig.output.write(JSON.stringify(results), "utf8", () => {
+    process.exit(0);
+  });
 } catch (err) {
   if (isDebugMode) {
     throw err;

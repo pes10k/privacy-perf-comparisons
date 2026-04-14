@@ -27,20 +27,6 @@ const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
 
-let cachedVersion: undefined | VersionNumber;
-export const getVersion = async (): Promise<VersionNumber> => {
-  if (cachedVersion !== undefined) {
-    return cachedVersion;
-  }
-  const packageText: string = await readFile("./package.json", "utf8");
-  assert(typeof packageText === "string");
-  const packageData = JSON.parse(packageText) as { version: string };
-  const packageVersion: VersionNumber = packageData.version;
-  assert(packageVersion);
-  cachedVersion = packageVersion;
-  return cachedVersion;
-};
-
 export const defaultLaunchArgs = (): Partial<RunConfig> => {
   return {
     browser: BrowserType.Chromium,
@@ -55,6 +41,20 @@ export const defaultLaunchArgs = (): Partial<RunConfig> => {
       width: 1280,
     },
   };
+};
+
+let cachedVersion: undefined | VersionNumber;
+export const getVersion = async (): Promise<VersionNumber> => {
+  if (cachedVersion !== undefined) {
+    return cachedVersion;
+  }
+  const packageText: string = await readFile("./package.json", "utf8");
+  assert(typeof packageText === "string");
+  const packageData = JSON.parse(packageText) as { version: string };
+  const packageVersion: VersionNumber = packageData.version;
+  assert(packageVersion);
+  cachedVersion = packageVersion;
+  return cachedVersion;
 };
 
 const fileCheck = async (
@@ -151,8 +151,8 @@ const shouldIgnoreConfChecks = (): boolean => {
 // a location on disk to write results to, or it might be STDOUT.
 //
 // The rules for where to write results to are the following:
-// - if the output argument was empty or unused, then results are written to
-//   STDOUT, else
+// - if the output argument was empty, unused, or "-", then results are written
+//   to STDOUT, else
 // - if the output argument matches an existing file on disk, then we try to
 //   overwrite that file, else
 // - if the output argument matches a directory on disk, then we generate
@@ -163,7 +163,7 @@ const handleForResults = async (
   url: URL,
 ): Promise<Writable> => {
   // Case 1, in the function docblock: write to stdout.
-  if (output === undefined || output.trim().length === 0) {
+  if (output === undefined || output.trim().length === 0 || output === "-") {
     return process.stdout;
   }
 

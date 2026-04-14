@@ -4,7 +4,9 @@ Browser Perf Logger
 0.2.2
 ---
 
-Add "memory" measurement option.
+Add "memory-cpu" measurement option.
+
+Add additional logging level `debug`.
 
 0.2.1
 ---

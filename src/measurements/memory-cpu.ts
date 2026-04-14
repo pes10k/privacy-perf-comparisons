@@ -14,12 +14,17 @@ export interface ProcessDatapoint {
   pid: PID;
   // The memory used by this process, as it appears in the RSS column of 'ps'.
   mem: number;
+  // The CPU% used by this process, as it appears in the CPU% column of 'ps'.
+  cpu: number;
 }
 
 export interface Datapoint {
   // Total memory use represented in this datapoint (i.e., summing the "amount"
   // values from each ProcessDatapoint).
-  summary: number;
+  totals: {
+    memory: number;
+    cpu: number;
+  };
   processes: ProcessDatapoint[];
   type: DatapointType;
   time: Date;
@@ -35,6 +40,7 @@ const processUsage = async (pid: PID): Promise<ProcessDatapoint> => {
       const procDatapoint: ProcessDatapoint = {
         pid: pid,
         mem: stats.memory,
+        cpu: stats.cpu,
       };
       resolve(procDatapoint);
     });
@@ -47,15 +53,15 @@ const processTreeUsage = async (
 ): Promise<ProcessDatapoint[]> => {
   const log = logger.prefixedLogger("processTreeUsage(): ");
   return new Promise((resolve, reject) => {
-    log.verbose("Fetching psTree for pid: ", pid);
+    log.debug("Fetching psTree for pid: ", pid);
     psTree(pid, (error: Error | null, children: readonly PS[]) => {
       if (error) {
-        log.verbose("no child processes for pid: ", pid);
+        log.debug("no child processes for pid: ", pid);
         reject(error);
         return;
       }
 
-      log.verbose("num child processes for pid: ", pid, ", ", children.length);
+      log.debug("num child processes for pid: ", pid, ", ", children.length);
       const childDataPromises: Promise<ProcessDatapoint>[] = [];
       const childDataPids: PID[] = [];
       for (const aChild of children) {
@@ -81,11 +87,11 @@ const processTreeUsage = async (
             index += 1;
             const prefix = `(${index.toString()}/${numResults.toString()}) `;
             if (aResult.status === "rejected") {
-              log.verbose(prefix, "Error receiving usage data for pid: ", aPid);
-              log.verbose(aResult.reason);
+              log.debug(prefix, "Error receiving usage data for pid: ", aPid);
+              log.debug(aResult.reason);
             } else {
               numReject += 1;
-              log.verbose(prefix, "Received usage data for pid: ", aPid);
+              log.debug(prefix, "Received usage data for pid: ", aPid);
               childDataPoints.push(aResult.value);
             }
           }
@@ -116,17 +122,22 @@ const getDatapoint = async (
   type: DatapointType,
 ): Promise<Datapoint> => {
   const subLog = logger.prefixedLogger("getDatapoint(): ");
-  subLog.verbose("fetching for pid=", pid);
+  subLog.verbose("fetching memory usage for pid=", pid);
   const childDatapoints = await processTreeUsage(logger, pid);
-  subLog.verbose("num successful datapoints: ", childDatapoints.length);
+  subLog.debug("num successful datapoints: ", childDatapoints.length);
 
   let memoryTotal = 0;
+  let cpuTotal = 0;
   for (const aDatapoint of childDatapoints) {
     memoryTotal += aDatapoint.mem;
+    cpuTotal += aDatapoint.cpu;
   }
 
   const datapoint: Datapoint = {
-    summary: memoryTotal,
+    totals: {
+      memory: memoryTotal,
+      cpu: cpuTotal,
+    },
     processes: childDatapoints,
     time: new Date(),
     type: type,
@@ -134,12 +145,12 @@ const getDatapoint = async (
   return datapoint;
 };
 
-export class MemoryMeasurer extends BaseMeasurer {
+export class MemoryCPUMeasurer extends BaseMeasurer {
   // Interval for how often to take memory measurements once we've started
   // "the experiment" (i.e., loading the webpage).
   static intervalMs = 5000;
 
-  readonly type = MeasurementType.Memory;
+  readonly type = MeasurementType.MemoryCPU;
   readonly #pid: PID;
   readonly #measurements: Datapoint[] = [];
 
@@ -151,36 +162,34 @@ export class MemoryMeasurer extends BaseMeasurer {
   }
 
   async beforeStart(): Promise<undefined> {
-    const logger = this.logger.prefixedLogger("MemoryMeasurer:beforeStart(): ");
-    const datapoint = await getDatapoint(logger, this.#pid, "before");
+    const log = this.logger.prefixedLogger("MemoryCPUMeasurer:beforeStart(): ");
+    const datapoint = await getDatapoint(log, this.#pid, "before");
     this.#measurements.push(datapoint);
   }
 
   start(): undefined {
-    const logger = this.logger.prefixedLogger("MemoryMeasurer:start(): ");
+    const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:start(): ");
     this.#intervalId = setInterval(() => {
       getDatapoint(logger, this.#pid, "during")
         .then((x) => {
           this.#measurements.push(x);
         })
         .catch((err: unknown) => {
-          logger.error("WHAT IS THIS");
-          logger.error(err);
           this.logError(err);
         });
-    }, MemoryMeasurer.intervalMs);
+    }, MemoryCPUMeasurer.intervalMs);
   }
 
   close(): boolean {
     if (!this.#intervalId) {
-      throw new Error("MemoryMeasurer: closed measurer that was not started");
+      throw new Error("MemoryCPUMeasurer: closed measurer that wasn't started");
     }
     clearInterval(this.#intervalId);
     return super.close();
   }
 
   async collect(): Promise<MeasurementResult | null> {
-    const logger = this.logger.prefixedLogger("MemoryMeasurer:collect(): ");
+    const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:collect(): ");
     const datapoint = await getDatapoint(logger, this.#pid, "end");
     this.#measurements.push(datapoint);
     return {

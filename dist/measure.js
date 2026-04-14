@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { getVersion } from "./config.js";
-import { MemoryMeasurer } from "./measurements/memory.js";
+import { MemoryCPUMeasurer } from "./measurements/memory-cpu.js";
 import { NetworkMeasurer } from "./measurements/network.js";
 import { TimingMeasurer } from "./measurements/timing.js";
 import { MeasurementType } from "./types.js";
 const measurerTypeToClassMap = {
-    [MeasurementType.Memory]: MemoryMeasurer,
+    [MeasurementType.MemoryCPU]: MemoryCPUMeasurer,
     [MeasurementType.Network]: NetworkMeasurer,
     [MeasurementType.Timing]: TimingMeasurer,
 };
@@ -58,7 +58,6 @@ export const measureURL = async (logger, context, url, seconds, timeout, measure
     log.info(`Letting page load for "${String(seconds)}" seconds`);
     await page.waitForTimeout(seconds * 1000);
     for (const aMeasurer of measurers.values()) {
-        log.verbose("Closing measurements for: ", aMeasurer.type);
         aMeasurer.close();
     }
     const eventDrainTimeMs = 5 * 1000;

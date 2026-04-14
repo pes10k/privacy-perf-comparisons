@@ -109,8 +109,9 @@ try {
     const logger = getLogger(isDebugMode ? LoggingLevel.Verbose : loggingLevel);
     const browserContext = await launch(logger, runConfig);
     const results = await measureURL(logger, browserContext, url, seconds, timeout, measurements, preservePages);
-    runConfig.output.write(JSON.stringify(results));
-    process.exit(0);
+    runConfig.output.write(JSON.stringify(results), "utf8", () => {
+        process.exit(0);
+    });
 }
 catch (err) {
     if (isDebugMode) {

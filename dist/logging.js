@@ -4,6 +4,7 @@ export var LoggingLevel;
     LoggingLevel["Error"] = "error";
     LoggingLevel["Info"] = "info";
     LoggingLevel["Verbose"] = "verbose";
+    LoggingLevel["Debug"] = "debug";
 })(LoggingLevel || (LoggingLevel = {}));
 const nullLogFunc = () => {
     // pass
@@ -41,6 +42,13 @@ const baseLogFunc = (isError, prefix, ...msg) => {
         console.log(finalMessage);
     }
 };
+const levelToIntMap = {
+    [LoggingLevel.None]: 0,
+    [LoggingLevel.Error]: 1,
+    [LoggingLevel.Info]: 2,
+    [LoggingLevel.Verbose]: 3,
+    [LoggingLevel.Debug]: 4,
+};
 class BaseLogger {
     #prefix;
     constructor(prefix) {
@@ -52,16 +60,12 @@ class BaseLogger {
         return new this.constructor(prefix);
     }
     willLogFor(level) {
-        switch (level) {
-            case LoggingLevel.None:
-                return false;
-            case LoggingLevel.Error:
-                return this.level === LoggingLevel.Error;
-            case LoggingLevel.Info:
-                return (this.level === LoggingLevel.Error || this.level === LoggingLevel.Info);
-            case LoggingLevel.Verbose:
-                return true;
-        }
+        const thisLoggingLevelNum = levelToIntMap[this.level];
+        const thatLoggingLevelNum = levelToIntMap[level];
+        return thatLoggingLevelNum <= thisLoggingLevelNum;
+    }
+    error(...msg) {
+        baseLogFunc(true, "ERROR:", this.#prefix, ...msg);
     }
     info(...msg) {
         baseLogFunc(false, "INFO:", this.#prefix, ...msg);
@@ -69,8 +73,8 @@ class BaseLogger {
     verbose(...msg) {
         baseLogFunc(false, "VERBOSE:", this.#prefix, ...msg);
     }
-    error(...msg) {
-        baseLogFunc(true, "ERROR:", this.#prefix, ...msg);
+    debug(...msg) {
+        baseLogFunc(false, "DEBUG:", this.#prefix, ...msg);
     }
 }
 class NullLogger extends BaseLogger {
@@ -78,24 +82,32 @@ class NullLogger extends BaseLogger {
     info = nullLogFunc;
     verbose = nullLogFunc;
     error = nullLogFunc;
+    debug = nullLogFunc;
 }
 class ErrorLogger extends BaseLogger {
     level = LoggingLevel.Error;
     info = nullLogFunc;
     verbose = nullLogFunc;
+    debug = nullLogFunc;
 }
 class InfoLogger extends BaseLogger {
     level = LoggingLevel.Info;
     verbose = nullLogFunc;
+    debug = nullLogFunc;
 }
 class VerboseLogger extends BaseLogger {
     level = LoggingLevel.Verbose;
+    debug = nullLogFunc;
+}
+class DebugLogger extends BaseLogger {
+    level = LoggingLevel.Debug;
 }
 const logLevelToLoggerMap = {
-    [LoggingLevel.Error]: new ErrorLogger(),
     [LoggingLevel.None]: new NullLogger(),
+    [LoggingLevel.Error]: new ErrorLogger(),
     [LoggingLevel.Info]: new InfoLogger(),
     [LoggingLevel.Verbose]: new VerboseLogger(),
+    [LoggingLevel.Debug]: new DebugLogger(),
 };
 export const getLogger = (level) => {
     return logLevelToLoggerMap[level];

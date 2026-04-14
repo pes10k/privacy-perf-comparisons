@@ -1,49 +1,6 @@
-import assert from "node:assert/strict";
 import { chromium, firefox, webkit } from "@playwright/test";
-import { BrowserType, } from "./types.js";
-const browserTypeMapping = {
-    [BrowserType.Brave]: chromium,
-    [BrowserType.Chromium]: chromium,
-    [BrowserType.Gecko]: firefox,
-    [BrowserType.WebKit]: webkit,
-};
-const launchArgsEmpty = () => {
-    return [];
-};
-const launchArgsForBrave = (config) => {
-    const launchArgs = launchArgsForChromium(config);
-    launchArgs.push("--disable-brave-update");
-    launchArgs.push("--disable-sync");
-    return launchArgs;
-};
-const launchArgsForChromium = (config) => {
-    const launchArgs = ["--disable-features=MacAppCodeSignClone"];
-    if (config.profile) {
-        launchArgs.push(`--profile-directory="${config.profile}`);
-    }
-    return launchArgs;
-};
-const launchArgsForGecko = () => {
-    return launchArgsEmpty();
-};
-const launchArgsForConfig = (config) => {
-    let launchArgsFunc;
-    switch (config.browser) {
-        case BrowserType.Brave:
-            launchArgsFunc = launchArgsForBrave;
-            break;
-        case BrowserType.Chromium:
-            launchArgsFunc = launchArgsForChromium;
-            break;
-        case BrowserType.Gecko:
-            launchArgsFunc = launchArgsForGecko;
-            break;
-        case BrowserType.WebKit:
-            launchArgsFunc = launchArgsEmpty;
-            break;
-    }
-    assert(launchArgsFunc);
-    const browserArgs = launchArgsFunc(config);
+import { BrowserType } from "./types.js";
+const launchOptionsDefault = (config) => {
     // We implement *not* preserving tabs and pages that are open in the user
     // browser state by
     // 1. launching the browser in offline mode
@@ -51,9 +8,8 @@ const launchArgsForConfig = (config) => {
     //    user-data-dir/profile state
     // 3. and then, enabling networking.
     const startInOfflineMode = !config.preservePages;
-    const defaultBrowserArgs = [];
-    const launchOptions = {
-        args: defaultBrowserArgs.concat(browserArgs),
+    return {
+        args: [],
         executablePath: config.binary,
         headless: false,
         offline: startInOfflineMode,
@@ -64,18 +20,53 @@ const launchArgsForConfig = (config) => {
         serviceWorkers: "block",
         timeout: config.timeout * 1000,
     };
-    return launchOptions;
 };
-const getContext = async (browser, userDataDir, launchArgs) => {
-    const browserType = browserTypeMapping[browser];
-    assert(browserType);
-    return await browserType.launchPersistentContext(userDataDir, launchArgs);
+const launchOptionsBrave = (config) => {
+    const options = launchOptionsChromium(config);
+    options.args.push("--disable-brave-update");
+    options.args.push("--disable-sync");
+    return options;
+};
+const launchOptionsChromium = (config) => {
+    const options = launchOptionsDefault(config);
+    options.args.push("--disable-features=MacAppCodeSignClone");
+    if (config.profile) {
+        options.args.push(`--profile-directory="${config.profile}`);
+    }
+    return options;
+};
+const launchOptionsGecko = (config) => {
+    return launchOptionsDefault(config);
+};
+const launchOptionsWebKit = (config) => {
+    return launchOptionsDefault(config);
+};
+const browserTypeConfigMapping = {
+    [BrowserType.Brave]: {
+        type: chromium,
+        options: launchOptionsBrave,
+    },
+    [BrowserType.Chromium]: {
+        type: chromium,
+        options: launchOptionsChromium,
+    },
+    [BrowserType.Gecko]: {
+        type: firefox,
+        options: launchOptionsGecko,
+    },
+    [BrowserType.WebKit]: {
+        type: webkit,
+        options: launchOptionsWebKit,
+    },
 };
 export const launch = async (logger, config) => {
-    const browserType = config.browser;
+    const paramsForBrowser = browserTypeConfigMapping[config.browser];
+    const launchOptionsForConfigFunc = paramsForBrowser.options;
+    const opts = launchOptionsForConfigFunc(config);
+    const browser = paramsForBrowser.type;
     const userDataDir = config.userDataDir;
-    const launchArgs = launchArgsForConfig(config);
-    logger.info("Launching browser with args: ", { ...launchArgs, userDataDir });
-    return await getContext(browserType, userDataDir, launchArgs);
+    logger.info("Launching with options: ", { ...opts, userDataDir });
+    const context = await browser.launchPersistentContext(userDataDir, opts);
+    return context;
 };
 //# sourceMappingURL=browser.js.map

@@ -10,12 +10,13 @@ export type VersionNumber = string;
 export type WSFrame = string | Buffer;
 
 export interface PersistentLaunchOptions extends LaunchOptions {
+  args: string[];
   offline: boolean;
-  viewport?: {
+  viewport: {
     height: number;
     width: number;
   };
-  serviceWorkers?: "allow" | "block";
+  serviceWorkers: "allow" | "block";
 }
 
 export enum BrowserType {
@@ -26,7 +27,7 @@ export enum BrowserType {
 }
 
 export enum MeasurementType {
-  Memory = "memory",
+  MemoryCPU = "memory-cpu",
   Network = "network",
   Timing = "timing",
 }

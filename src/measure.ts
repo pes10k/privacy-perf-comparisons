@@ -9,13 +9,13 @@ import {
   MeasurementResult,
   BaseMeasurerChild,
 } from "./measurements/base.js";
-import { MemoryMeasurer } from "./measurements/memory.js";
+import { MemoryCPUMeasurer } from "./measurements/memory-cpu.js";
 import { NetworkMeasurer } from "./measurements/network.js";
 import { TimingMeasurer } from "./measurements/timing.js";
 import { MeasurementType, Report } from "./types.js";
 
 const measurerTypeToClassMap: Record<MeasurementType, BaseMeasurerChild> = {
-  [MeasurementType.Memory]: MemoryMeasurer,
+  [MeasurementType.MemoryCPU]: MemoryCPUMeasurer,
   [MeasurementType.Network]: NetworkMeasurer,
   [MeasurementType.Timing]: TimingMeasurer,
 };
@@ -84,7 +84,6 @@ export const measureURL = async (
   await page.waitForTimeout(seconds * 1000);
 
   for (const aMeasurer of measurers.values()) {
-    log.verbose("Closing measurements for: ", aMeasurer.type);
     aMeasurer.close();
   }
 

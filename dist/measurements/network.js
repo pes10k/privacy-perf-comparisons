@@ -29,13 +29,11 @@ const logSize = (logger, url, desc, method, bodySize, headerSize) => {
         return;
     }
     const totalSize = bodySize + headerSize;
-    const msg = [
-        `method=${method}`,
-        `size=${totalSize.toString()}`,
-        `(body=${bodySize.toString()}, headers=${headerSize.toString()})`,
-        `url=${url}`,
-    ].join(", ");
-    logger.verbose(desc, ": ", msg);
+    const msg = `method=${method}` +
+        `size=${totalSize.toString()}` +
+        `(body=${bodySize.toString()}, headers=${headerSize.toString()})` +
+        `url=${url}`;
+    logger.debug(desc, msg);
 };
 const logSizeError = (logger, url, desc, method, error) => {
     if (!logger.willLogFor(LoggingLevel.Error)) {
@@ -43,60 +41,60 @@ const logSizeError = (logger, url, desc, method, error) => {
     }
     const errMsg = error instanceof Error ? error.toString() : String(error);
     const msg = `method=${method}, error=${errMsg}, url=${url}`;
-    logger.error(desc, ": ", msg);
+    logger.error(desc, msg);
 };
 const getRequestSize = async (logger, request) => {
     const url = request.url();
-    const vLog = logSize.bind(undefined, logger, url, "getRequestSize");
-    const eLog = logSizeError.bind(undefined, logger, url, "getRequestSize");
+    const dLog = logSize.bind(undefined, logger, url, "getRequestSize(): ");
+    const eLog = logSizeError.bind(undefined, logger, url, "getRequestSize(): ");
     try {
         const sizes = await request.sizes();
         const bodySize = sizes.requestBodySize;
         const headerSize = sizes.requestHeadersSize;
         const totalSize = bodySize + headerSize;
-        vLog("Request.sizes()", bodySize, headerSize);
+        dLog("Request.sizes(): ", bodySize, headerSize);
         return totalSize;
     }
     catch (err) {
-        eLog("Request.sizes()", err);
+        eLog("Request.sizes(): ", err);
     }
     try {
         const bodySize = request.postDataBuffer()?.length ?? 0;
         const headerSize = approxLengthOfHeaders(await request.headersArray());
         const totalSize = bodySize + headerSize;
-        vLog("Request.postDataBuffer().length", bodySize, headerSize);
+        dLog("Request.postDataBuffer().length: ", bodySize, headerSize);
         return totalSize;
     }
     catch (err) {
-        eLog("Request.postDataBuffer().length", err);
+        eLog("Request.postDataBuffer().length: ", err);
     }
     return null;
 };
 const getResponseSize = async (logger, response) => {
     const url = response.url();
-    const vLog = logSize.bind(undefined, logger, url, "getResponseSize");
-    const eLog = logSizeError.bind(undefined, logger, url, "getResponseSize");
+    const dLog = logSize.bind(undefined, logger, url, "getResponseSize(): ");
+    const eLog = logSizeError.bind(undefined, logger, url, "getResponseSize(): ");
     try {
         const request = response.request();
         const sizes = await request.sizes();
         const bodySize = sizes.responseBodySize;
         const headerSize = sizes.responseHeadersSize;
         const totalSize = bodySize + headerSize;
-        vLog("Request.sizes()", bodySize, headerSize);
+        dLog("Request.sizes(): ", bodySize, headerSize);
         return totalSize;
     }
     catch (err) {
-        eLog("Request.sizes()", err);
+        eLog("Request.sizes(): ", err);
     }
     try {
         const bodySize = (await response.body()).length;
         const headerSize = approxLengthOfHeaders(await response.headersArray());
         const totalSize = bodySize + headerSize;
-        vLog("response.body().length", bodySize, headerSize);
+        dLog("response.body().length: ", bodySize, headerSize);
         return totalSize;
     }
     catch (err) {
-        eLog("response.body().length", err);
+        eLog("response.body().length: ", err);
     }
     return null;
 };
@@ -145,7 +143,7 @@ class PageNetworkLogger {
             url: url,
         };
         this.#requests.push(datapoint);
-        this.#logger.verbose("Network (Sent): ", datapoint);
+        this.#logger.debug("Network (Sent): ", datapoint);
         return datapoint;
     }
     addWebSocketResponse(url, data) {
@@ -159,7 +157,7 @@ class PageNetworkLogger {
             url: url,
         };
         this.#responses.push(datapoint);
-        this.#logger.verbose("Network (Received): ", datapoint);
+        this.#logger.debug("Network (Received): ", datapoint);
         return datapoint;
     }
     async addRequest(request) {
@@ -172,7 +170,7 @@ class PageNetworkLogger {
             type: request.resourceType(),
             url: request.url(),
         };
-        this.#logger.verbose("Network (Sent): ", datapoint);
+        this.#logger.debug("Network (Sent): ", datapoint);
         this.#requests.push(datapoint);
         return datapoint;
     }
@@ -188,7 +186,7 @@ class PageNetworkLogger {
             url: response.url(),
         };
         this.#responses.push(datapoint);
-        this.#logger.verbose("Network (Received): ", datapoint);
+        this.#logger.debug("Network (Received): ", datapoint);
         // And now see if this response was a result of a redirection chain,
         // in which case we need to add all the intermediate requests too
         // (since we'll have already recorded the initial request).

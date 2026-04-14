@@ -12,6 +12,7 @@ const processUsage = async (pid) => {
             const procDatapoint = {
                 pid: pid,
                 mem: stats.memory,
+                cpu: stats.cpu,
             };
             resolve(procDatapoint);
         });
@@ -88,22 +89,27 @@ const getDatapoint = async (logger, pid, type) => {
     const childDatapoints = await processTreeUsage(logger, pid);
     subLog.debug("num successful datapoints: ", childDatapoints.length);
     let memoryTotal = 0;
+    let cpuTotal = 0;
     for (const aDatapoint of childDatapoints) {
         memoryTotal += aDatapoint.mem;
+        cpuTotal += aDatapoint.cpu;
     }
     const datapoint = {
-        summary: memoryTotal,
+        totals: {
+            memory: memoryTotal,
+            cpu: cpuTotal,
+        },
         processes: childDatapoints,
         time: new Date(),
         type: type,
     };
     return datapoint;
 };
-export class MemoryMeasurer extends BaseMeasurer {
+export class MemoryCPUMeasurer extends BaseMeasurer {
     // Interval for how often to take memory measurements once we've started
     // "the experiment" (i.e., loading the webpage).
     static intervalMs = 5000;
-    type = MeasurementType.Memory;
+    type = MeasurementType.MemoryCPU;
     #pid;
     #measurements = [];
     #intervalId = undefined;
@@ -112,12 +118,12 @@ export class MemoryMeasurer extends BaseMeasurer {
         this.#pid = process.pid;
     }
     async beforeStart() {
-        const logger = this.logger.prefixedLogger("MemoryMeasurer:beforeStart(): ");
-        const datapoint = await getDatapoint(logger, this.#pid, "before");
+        const log = this.logger.prefixedLogger("MemoryCPUMeasurer:beforeStart(): ");
+        const datapoint = await getDatapoint(log, this.#pid, "before");
         this.#measurements.push(datapoint);
     }
     start() {
-        const logger = this.logger.prefixedLogger("MemoryMeasurer:start(): ");
+        const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:start(): ");
         this.#intervalId = setInterval(() => {
             getDatapoint(logger, this.#pid, "during")
                 .then((x) => {
@@ -126,17 +132,17 @@ export class MemoryMeasurer extends BaseMeasurer {
                 .catch((err) => {
                 this.logError(err);
             });
-        }, MemoryMeasurer.intervalMs);
+        }, MemoryCPUMeasurer.intervalMs);
     }
     close() {
         if (!this.#intervalId) {
-            throw new Error("MemoryMeasurer: closed measurer that was not started");
+            throw new Error("MemoryCPUMeasurer: closed measurer that wasn't started");
         }
         clearInterval(this.#intervalId);
         return super.close();
     }
     async collect() {
-        const logger = this.logger.prefixedLogger("MemoryMeasurer:collect(): ");
+        const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:collect(): ");
         const datapoint = await getDatapoint(logger, this.#pid, "end");
         this.#measurements.push(datapoint);
         return {
@@ -145,4 +151,4 @@ export class MemoryMeasurer extends BaseMeasurer {
         };
     }
 }
-//# sourceMappingURL=memory.js.map
+//# sourceMappingURL=memory-cpu.js.map
