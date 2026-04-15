@@ -20,7 +20,7 @@ const launchOptionsDefault = (config: RunConfig): PersistentLaunchOptions => {
   // 3. and then, enabling networking.
   const startInOfflineMode = !config.preservePages;
   return {
-    args: [],
+    args: config.args ?? [],
     executablePath: config.binary,
     headless: false,
     offline: startInOfflineMode,
@@ -44,7 +44,7 @@ const launchOptionsChromium = (config: RunConfig): PersistentLaunchOptions => {
   const options = launchOptionsDefault(config);
   options.args.push("--disable-features=MacAppCodeSignClone");
   if (config.profile) {
-    options.args.push(`--profile-directory="${config.profile}`);
+    options.args.push(`--profile-directory="${config.profile}"`);
   }
   return options;
 };

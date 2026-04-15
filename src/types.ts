@@ -41,6 +41,7 @@ export interface Report {
 }
 
 export interface RunConfig {
+  args?: string[];
   binary: Path;
   browser: BrowserType;
   loggingLevel: LoggingLevel;

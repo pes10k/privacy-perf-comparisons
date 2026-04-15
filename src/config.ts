@@ -409,7 +409,13 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   assert(typeof args.preserve_pages === "boolean");
   const preservePages = args.preserve_pages;
 
+  let additionalArgs: undefined | string[];
+  if (Array.isArray(args.args)) {
+    additionalArgs = args.args.map((x) => `--${String(x)}`);
+  }
+
   return {
+    args: additionalArgs,
     binary: binaryPath,
     browser: browserType,
     loggingLevel: loggingLevel,

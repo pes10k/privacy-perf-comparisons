@@ -1,6 +1,11 @@
 Browser Perf Logger
 ===
 
+0.2.3
+---
+
+Add ability to pass additional arguments to browsers from the CLI.
+
 0.2.2
 ---
 

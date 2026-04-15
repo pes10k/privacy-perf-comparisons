@@ -329,7 +329,12 @@ export const runConfigForArgs = async (args) => {
     const outputHandle = await handleForResults(outputPath, args.url);
     assert(typeof args.preserve_pages === "boolean");
     const preservePages = args.preserve_pages;
+    let additionalArgs;
+    if (Array.isArray(args.args)) {
+        additionalArgs = args.args.map((x) => `--${String(x)}`);
+    }
     return {
+        args: additionalArgs,
         binary: binaryPath,
         browser: browserType,
         loggingLevel: loggingLevel,
