@@ -1,6 +1,26 @@
 Browser Perf Logger
 ===
 
+0.2.5
+---
+
+Added `--firefox-user-prefs` argument, which takes a JSON text which are
+set as `about:config` preferences and (importantly) override the
+playwright firefox overrides.
+See: https://github.com/microsoft/playwright/blob/main/browser_patches/firefox/preferences/playwright.cfg
+
+Override many other configuration changes Playwright makes to Firefox
+default preferences.
+
+Minor typo fixes in error messages when validating arguments and building
+a run configuration.
+
+0.2.4
+---
+
+No longer pass `--disable-features=MacAppCodeSignClone` by default, as it
+seems to create profile correctness issues.
+
 0.2.3
 ---
 

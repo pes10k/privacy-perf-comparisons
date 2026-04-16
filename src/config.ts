@@ -16,6 +16,7 @@ import { chromium, firefox, webkit } from "playwright";
 
 import {
   BrowserType,
+  FirefoxUserPrefs,
   MeasurementType,
   Path,
   RunConfig,
@@ -291,7 +292,8 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     log.verbose("\t", "- using existing user-data dir: ", validatedUserDataDir);
   } else if (isCaseFour) {
     assert(userDataDirArg);
-    validatedUserDataDir = join(userDataDirArg, args.profile);
+    // validatedUserDataDir = join(userDataDirArg, args.profile);
+    validatedUserDataDir = userDataDirArg;
     validatedProfile = args.profile;
     log.verbose("\t", "- using user-data dir: ", validatedUserDataDir);
     log.verbose("\t", "- with profile name: ", args.profile);
@@ -321,7 +323,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
       case BrowserType.Brave:
         throw new Error(
           "Must include a binary path when testing Brave (since " +
-            "playwright does not have a default Brave binary included",
+            "playwright does not have a default Brave binary included).",
         );
       case BrowserType.Chromium:
         isUsingPlaywrightBinary = true;
@@ -414,10 +416,32 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     additionalArgs = args.args.map((x) => `--${String(x)}`);
   }
 
+  let firefoxPrefs: FirefoxUserPrefs | undefined;
+  if (args.firefox_user_prefs) {
+    assert(typeof args.firefox_user_prefs === "string");
+    if (browserType !== BrowserType.Gecko) {
+      throw new Error(
+        "Cannot use the --firefox-user-prefs (-f) argument for any --browser " +
+          `argument other than 'gecko'; received --browser = '${browserType}'.`,
+      );
+    }
+    try {
+      firefoxPrefs = JSON.parse(args.firefox_user_prefs) as FirefoxUserPrefs;
+    } catch (err: unknown) {
+      throw new Error(
+        "Received invalid JSON string for --firefox-user-prefs (-f) " +
+          `argument. Argument '${args.firefox_user_prefs}' produced format ` +
+          "error: \n" +
+          (err as Error).toString(),
+      );
+    }
+  }
+
   return {
     args: additionalArgs,
     binary: binaryPath,
     browser: browserType,
+    firefoxUserPrefs: firefoxPrefs,
     loggingLevel: loggingLevel,
     measurements: mesToPerform,
     output: outputHandle,

@@ -50,7 +50,33 @@ const launchOptionsChromium = (config: RunConfig): PersistentLaunchOptions => {
 };
 
 const launchOptionsGecko = (config: RunConfig): PersistentLaunchOptions => {
-  return launchOptionsDefault(config);
+  const options = launchOptionsDefault(config);
+  // Undo some of the changes Playwright makes to default Firefox behavior,
+  // see:
+  // https://github.com/microsoft/playwright/blob/main/browser_patches/firefox/preferences/playwright.cfg
+  options.firefoxUserPrefs = {
+    "fission.webContentIsolationStrategy": 1,
+    "fission.bfcacheInParent": true,
+    "network.cookie.CHIPS.enabled": true,
+    "dom.ipc.processCount": 8,
+    "dom.ipc.processPrelaunch.enabled": true,
+    "permissions.isolateBy.userContext": false,
+    "dom.file.createInChild": false,
+    "dom.disable_open_during_load": true,
+    "webgl.forbid-software": true,
+    "browser.safebrowsing.blockedURIs.enabled": false,
+    "browser.safebrowsing.downloads.enabled": false,
+    "browser.safebrowsing.passwords.enabled": false,
+    "browser.safebrowsing.malware.enabled": false,
+    "browser.safebrowsing.phishing.enabled": false,
+    "privacy.trackingprotection.enabled": false,
+  };
+  if (config.firefoxUserPrefs) {
+    for (const [key, value] of Object.entries(config.firefoxUserPrefs)) {
+      options.firefoxUserPrefs[key] = value;
+    }
+  }
+  return options;
 };
 
 const launchOptionsWebKit = (config: RunConfig): PersistentLaunchOptions => {

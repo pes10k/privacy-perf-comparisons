@@ -107,6 +107,13 @@ parser.add_argument("-x", "--binary-path", {
     "Chromium family browsers do not require any playwright patches, " +
     "while the gecko and webkit ones do.",
 });
+parser.add_argument("-f", "--firefox-user-prefs", {
+  help:
+    "Optional JSON of Firefox about:config overrides and settings. If " +
+    "provided, these will be applied after Playwright's preference " +
+    "overrides. This argument can only be used when the browser argument " +
+    "is 'gecko'.",
+});
 parser.add_argument("-a", "--args", {
   help:
     "Additional arguments that are passed along to the shell when " +
