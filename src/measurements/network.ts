@@ -13,17 +13,28 @@ import { BaseMeasurer, MeasurementResult } from "./base.js";
 import { Logger, LoggingLevel } from "../logging.js";
 import { MeasurementType, Serializable, WSFrame } from "../types.js";
 
+type SecurityContext = string | null;
 type HTTPHeaders = { name: string; value: string }[];
 type ResourceType = string;
 type Timestamp = number;
 type URLString = string;
 
 interface Datapoint {
+  context: SecurityContext;
   size: number;
   time: Timestamp;
   type: ResourceType;
   url: URLString;
 }
+
+const getSecurityContext = async (frame: Frame): Promise<SecurityContext> => {
+  const response = await frame.evaluate("window.origin");
+  if (response === undefined) {
+    return null;
+  }
+  assert(typeof response === "string");
+  return response;
+};
 
 // This is only an approximation for a bunch of reasons, including
 // differences in string encoding, and normalization that the browsers,
@@ -188,12 +199,17 @@ class PageNetworkLogger {
     return false;
   }
 
-  addWebSocketRequest(url: URLString, data: WSFrame): Datapoint | null {
+  addWebSocketRequest(
+    url: URLString,
+    context: SecurityContext,
+    data: WSFrame,
+  ): Datapoint | null {
     if (this.logErrorIfClosed("ws request", url)) {
       return null;
     }
 
     const datapoint = {
+      context: context,
       size: data.length,
       time: Date.now(),
       type: "websocket",
@@ -204,12 +220,17 @@ class PageNetworkLogger {
     return datapoint;
   }
 
-  addWebSocketResponse(url: URLString, data: WSFrame): Datapoint | null {
+  addWebSocketResponse(
+    url: URLString,
+    context: SecurityContext,
+    data: WSFrame,
+  ): Datapoint | null {
     if (this.logErrorIfClosed("ws response", url)) {
       return null;
     }
 
     const datapoint = {
+      context: context,
       size: data.length,
       time: Date.now(),
       type: "websocket",
@@ -220,12 +241,16 @@ class PageNetworkLogger {
     return datapoint;
   }
 
-  async addRequest(request: Request): Promise<Datapoint | null> {
+  async addRequest(
+    request: Request,
+    context: SecurityContext,
+  ): Promise<Datapoint | null> {
     if (this.logErrorIfClosed("request", request.url())) {
       return null;
     }
 
     const datapoint: Datapoint = {
+      context: context,
       size: (await getRequestSize(this.#logger, request)) ?? -1,
       time: request.timing().requestStart,
       type: request.resourceType(),
@@ -236,13 +261,17 @@ class PageNetworkLogger {
     return datapoint;
   }
 
-  async addResponse(response: Response): Promise<Datapoint | null> {
+  async addResponse(
+    response: Response,
+    context: SecurityContext,
+  ): Promise<Datapoint | null> {
     if (this.logErrorIfClosed("response", response.url())) {
       return null;
     }
 
     let request = response.request();
     const datapoint: Datapoint = {
+      context: context,
       size: (await getResponseSize(this.#logger, response)) ?? -1,
       time: request.timing().responseEnd,
       type: request.resourceType(),
@@ -255,7 +284,8 @@ class PageNetworkLogger {
     // in which case we need to add all the intermediate requests too
     // (since we'll have already recorded the initial request).
     while (request.redirectedFrom()) {
-      await this.addRequest(request);
+      const securityContext = await getSecurityContext(request.frame());
+      await this.addRequest(request, securityContext);
       const nextRequest = request.redirectedFrom();
       assert(nextRequest);
       request = nextRequest;
@@ -279,28 +309,40 @@ class ContextNetworkLogger {
     this.#logger = logger;
   }
 
-  addWSRequest(page: Page, url: URLString, data: WSFrame): Datapoint | null {
+  async addWSRequest(
+    page: Page,
+    url: URLString,
+    data: WSFrame,
+  ): Promise<Datapoint | null> {
     const pageForRequest = this.#pageToLoggerMap.get(page);
     assert(pageForRequest);
-    return pageForRequest.addWebSocketRequest(url, data);
+    const securityContext = await getSecurityContext(page.mainFrame());
+    return pageForRequest.addWebSocketRequest(url, securityContext, data);
   }
 
-  addWSResponse(page: Page, url: URLString, data: WSFrame): Datapoint | null {
+  async addWSResponse(
+    page: Page,
+    url: URLString,
+    data: WSFrame,
+  ): Promise<Datapoint | null> {
     const pageForResponse = this.#pageToLoggerMap.get(page);
     assert(pageForResponse);
-    return pageForResponse.addWebSocketResponse(url, data);
+    const securityContext = await getSecurityContext(page.mainFrame());
+    return pageForResponse.addWebSocketResponse(url, securityContext, data);
   }
 
   async addRequest(page: Page, request: Request): Promise<Datapoint | null> {
     const pageForRequest = this.#pageToLoggerMap.get(page);
     assert(pageForRequest);
-    return await pageForRequest.addRequest(request);
+    const securityContext = await getSecurityContext(page.mainFrame());
+    return await pageForRequest.addRequest(request, securityContext);
   }
 
   async addResponse(page: Page, response: Response): Promise<Datapoint | null> {
     const pageForResponse = this.#pageToLoggerMap.get(page);
     assert(pageForResponse);
-    return await pageForResponse.addResponse(response);
+    const securityContext = await getSecurityContext(page.mainFrame());
+    return await pageForResponse.addResponse(response, securityContext);
   }
 
   // Notes that the top level frame in the page has navigated, and so
@@ -365,12 +407,12 @@ export class NetworkMeasurer extends BaseMeasurer {
     this.#netLogger.notePage(page);
     page.on("websocket", (webSocket: WebSocket) => {
       const wsUrl = webSocket.url();
-      webSocket.on("framesent", (data: { payload: WSFrame }) => {
-        this.#netLogger.addWSRequest(page, wsUrl, data.payload);
+      webSocket.on("framesent", async (data: { payload: WSFrame }) => {
+        await this.#netLogger.addWSRequest(page, wsUrl, data.payload);
       });
 
-      webSocket.on("framereceived", (data: { payload: WSFrame }) => {
-        this.#netLogger.addWSResponse(page, wsUrl, data.payload);
+      webSocket.on("framereceived", async (data: { payload: WSFrame }) => {
+        await this.#netLogger.addWSResponse(page, wsUrl, data.payload);
       });
     });
 

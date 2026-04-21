@@ -29,10 +29,14 @@ const launchOptionsBrave = (config) => {
 };
 const launchOptionsChromium = (config) => {
     const options = launchOptionsDefault(config);
+    // Playwright sets a *lot* of chromium flags by default. We don't want
+    // all of them. See:
+    // https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromiumSwitches.ts
     options.args.push("--disable-features=MacAppCodeSignClone");
     if (config.profile) {
         options.args.push(`--profile-directory="${config.profile}"`);
     }
+    options.chromiumSandbox = false;
     return options;
 };
 const launchOptionsGecko = (config) => {

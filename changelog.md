@@ -1,6 +1,11 @@
 Browser Perf Logger
 ===
 
+0.2.6
+---
+
+Add context to response/request records for network measurements.
+
 0.2.5
 ---
 

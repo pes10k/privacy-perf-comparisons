@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import { BaseMeasurer } from "./base.js";
 import { LoggingLevel } from "../logging.js";
 import { MeasurementType } from "../types.js";
+const getSecurityContext = async (frame) => {
+    const response = await frame.evaluate("window.origin");
+    if (response === undefined) {
+        return null;
+    }
+    assert(typeof response === "string");
+    return response;
+};
 // This is only an approximation for a bunch of reasons, including
 // differences in string encoding, and normalization that the browsers,
 // playwright, puppeteer/webdriver-bidi, and other things in the stack does
@@ -132,11 +140,12 @@ class PageNetworkLogger {
         }
         return false;
     }
-    addWebSocketRequest(url, data) {
+    addWebSocketRequest(url, context, data) {
         if (this.logErrorIfClosed("ws request", url)) {
             return null;
         }
         const datapoint = {
+            context: context,
             size: data.length,
             time: Date.now(),
             type: "websocket",
@@ -146,11 +155,12 @@ class PageNetworkLogger {
         this.#logger.debug("Network (Sent): ", datapoint);
         return datapoint;
     }
-    addWebSocketResponse(url, data) {
+    addWebSocketResponse(url, context, data) {
         if (this.logErrorIfClosed("ws response", url)) {
             return null;
         }
         const datapoint = {
+            context: context,
             size: data.length,
             time: Date.now(),
             type: "websocket",
@@ -160,11 +170,12 @@ class PageNetworkLogger {
         this.#logger.debug("Network (Received): ", datapoint);
         return datapoint;
     }
-    async addRequest(request) {
+    async addRequest(request, context) {
         if (this.logErrorIfClosed("request", request.url())) {
             return null;
         }
         const datapoint = {
+            context: context,
             size: (await getRequestSize(this.#logger, request)) ?? -1,
             time: request.timing().requestStart,
             type: request.resourceType(),
@@ -174,12 +185,13 @@ class PageNetworkLogger {
         this.#requests.push(datapoint);
         return datapoint;
     }
-    async addResponse(response) {
+    async addResponse(response, context) {
         if (this.logErrorIfClosed("response", response.url())) {
             return null;
         }
         let request = response.request();
         const datapoint = {
+            context: context,
             size: (await getResponseSize(this.#logger, response)) ?? -1,
             time: request.timing().responseEnd,
             type: request.resourceType(),
@@ -191,7 +203,8 @@ class PageNetworkLogger {
         // in which case we need to add all the intermediate requests too
         // (since we'll have already recorded the initial request).
         while (request.redirectedFrom()) {
-            await this.addRequest(request);
+            const securityContext = await getSecurityContext(request.frame());
+            await this.addRequest(request, securityContext);
             const nextRequest = request.redirectedFrom();
             assert(nextRequest);
             request = nextRequest;
@@ -211,25 +224,29 @@ class ContextNetworkLogger {
         this.#pageToLoggerMap = new WeakMap();
         this.#logger = logger;
     }
-    addWSRequest(page, url, data) {
+    async addWSRequest(page, url, data) {
         const pageForRequest = this.#pageToLoggerMap.get(page);
         assert(pageForRequest);
-        return pageForRequest.addWebSocketRequest(url, data);
+        const securityContext = await getSecurityContext(page.mainFrame());
+        return pageForRequest.addWebSocketRequest(url, securityContext, data);
     }
-    addWSResponse(page, url, data) {
+    async addWSResponse(page, url, data) {
         const pageForResponse = this.#pageToLoggerMap.get(page);
         assert(pageForResponse);
-        return pageForResponse.addWebSocketResponse(url, data);
+        const securityContext = await getSecurityContext(page.mainFrame());
+        return pageForResponse.addWebSocketResponse(url, securityContext, data);
     }
     async addRequest(page, request) {
         const pageForRequest = this.#pageToLoggerMap.get(page);
         assert(pageForRequest);
-        return await pageForRequest.addRequest(request);
+        const securityContext = await getSecurityContext(page.mainFrame());
+        return await pageForRequest.addRequest(request, securityContext);
     }
     async addResponse(page, response) {
         const pageForResponse = this.#pageToLoggerMap.get(page);
         assert(pageForResponse);
-        return await pageForResponse.addResponse(response);
+        const securityContext = await getSecurityContext(page.mainFrame());
+        return await pageForResponse.addResponse(response, securityContext);
     }
     // Notes that the top level frame in the page has navigated, and so
     // any future requests that happen on the page are happening on a different
@@ -284,11 +301,11 @@ export class NetworkMeasurer extends BaseMeasurer {
         this.#netLogger.notePage(page);
         page.on("websocket", (webSocket) => {
             const wsUrl = webSocket.url();
-            webSocket.on("framesent", (data) => {
-                this.#netLogger.addWSRequest(page, wsUrl, data.payload);
+            webSocket.on("framesent", async (data) => {
+                await this.#netLogger.addWSRequest(page, wsUrl, data.payload);
             });
-            webSocket.on("framereceived", (data) => {
-                this.#netLogger.addWSResponse(page, wsUrl, data.payload);
+            webSocket.on("framereceived", async (data) => {
+                await this.#netLogger.addWSResponse(page, wsUrl, data.payload);
             });
         });
         page.on("request", async (request) => {
