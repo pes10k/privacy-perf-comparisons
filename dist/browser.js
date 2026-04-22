@@ -21,6 +21,48 @@ const launchOptionsDefault = (config) => {
         timeout: config.timeout * 1000,
     };
 };
+// const playwrightChromeArgs = [
+//   "--disable-field-trial-config", // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
+//   "--disable-backgrounding-occluded-windows",
+//   "--disable-back-forward-cache", // Avoids surprises like main request not being intercepted during page.goBack().
+//   "--disable-breakpad",
+//   "--disable-client-side-phishing-detection",
+//   "--disable-component-extensions-with-background-pages",
+//   "--disable-component-update", // Avoids unneeded network activity after startup.
+//   "--no-default-browser-check",
+//   "--disable-default-apps",
+//   "--disable-dev-shm-usage",
+//   "--disable-edgeupdater", // Disables Edge-specific updater on mac.
+//   // '--disable-features=' + disabledFeatures.join(','),
+//   // process.env.PLAYWRIGHT_LEGACY_SCREENSHOT ? '' : '--enable-features=CDPScreenshotNewSurface',
+//   "--allow-pre-commit-input",
+//   "--disable-hang-monitor",
+//   "--disable-ipc-flooding-protection",
+//   "--disable-popup-blocking",
+//   "--disable-prompt-on-repost",
+//   "--disable-renderer-backgrounding",
+//   "--force-color-profile=srgb",
+//   "--metrics-recording-only",
+//   "--no-first-run",
+//   "--password-store=basic",
+//   "--use-mock-keychain",
+//   // See https://chromium-review.googlesource.com/c/chromium/src/+/2436773
+//   "--no-service-autorun",
+//   "--export-tagged-pdf",
+//   // https://chromium-review.googlesource.com/c/chromium/src/+/4853540
+//   "--disable-search-engine-choice-screen",
+//   // https://issues.chromium.org/41491762
+//   "--unsafely-disable-devtools-self-xss-warnings",
+//   // Edge can potentially restart on Windows (msRelaunchNoCompatLayer) which looses its file descriptors (stdout/stderr) and CDP (3/4). Disable until fixed upstream.
+//   "--edge-skip-compat-layer-relaunch",
+//   // This disables Chrome for Testing infobar that is visible in the persistent context.
+//   // The switch is ignored everywhere else, including Chromium/Chrome/Edge.
+//   "--disable-infobars",
+//   // Less annoying popups.
+//   "--disable-search-engine-choice-screen",
+//   // Prevents the "three dots" menu crash in IdentityManager::HasPrimaryAccount for ephemeral contexts.
+//   "--disable-sync",
+// ];
 const launchOptionsBrave = (config) => {
     const options = launchOptionsChromium(config);
     options.args.push("--disable-brave-update");
@@ -55,6 +97,7 @@ const playwrightDisabledFeatures = [
     "RenderDocument",
     // Prevents downloading optimization hints on startup.
     "OptimizationHints",
+    "CDPScreenshotNewSurface",
 ];
 const launchOptionsChromium = (config) => {
     const options = launchOptionsDefault(config);
