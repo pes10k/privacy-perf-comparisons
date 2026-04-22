@@ -3,12 +3,17 @@ import { BaseMeasurer } from "./base.js";
 import { LoggingLevel } from "../logging.js";
 import { MeasurementType } from "../types.js";
 const getSecurityContext = async (frame) => {
-    const response = await frame.evaluate("window.origin");
-    if (response === undefined) {
+    try {
+        const response = await frame.evaluate("window.origin");
+        if (response === undefined) {
+            return null;
+        }
+        assert(typeof response === "string");
+        return response;
+    }
+    catch {
         return null;
     }
-    assert(typeof response === "string");
-    return response;
 };
 // This is only an approximation for a bunch of reasons, including
 // differences in string encoding, and normalization that the browsers,

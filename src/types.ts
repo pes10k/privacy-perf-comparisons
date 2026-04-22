@@ -50,7 +50,6 @@ export interface RunConfig {
   measurements: MeasurementType[];
   output: Writable;
   preservePages: boolean;
-  profile?: string;
   seconds: number;
   timeout: number;
   url: URL;

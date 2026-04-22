@@ -6,6 +6,9 @@ Browser Perf Logger
 
 Add context to response/request records for network measurements.
 
+Remove support for named profiles (measurements must be taken with the default
+profile in the user data directory).
+
 0.2.5
 ---
 

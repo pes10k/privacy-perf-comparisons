@@ -34,7 +34,6 @@ export const defaultLaunchArgs = (): Partial<RunConfig> => {
     loggingLevel: LoggingLevel.Info,
     measurements: Object.values(MeasurementType),
     preservePages: false,
-    profile: "Default",
     seconds: 30,
     timeout: 30,
     viewport: {
@@ -219,16 +218,6 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   const isChromium =
     args.browser === BrowserType.Chromium || args.browser === BrowserType.Brave;
 
-  assert(typeof args.profile === "string");
-  if (args.browser === BrowserType.Gecko && args.profile !== args.profile) {
-    throw new Error(
-      "Cannot use different profiles within the same profile " +
-        "directory for Gecko browsers. Use --user-data-dir to use different " +
-        "browser configurations for gecko browsers (instead of multiple " +
-        "profiles within the same profile directory).",
-    );
-  }
-
   // Here we check that one of the following conditions are true:
   // 1. the user didn't specify a user-data-dir (in which case we create
   //    a temporary one).
@@ -255,14 +244,11 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   }
 
   let isUserDataDirExisting: boolean | undefined;
-  let isProfileReadable: boolean | undefined;
 
   if (!userDataDirArg) {
     isUserDataDirExisting = false;
-    isProfileReadable = false;
   } else if (await isPathToReadableDir(userDataDirArg)) {
     isUserDataDirExisting = true;
-    isProfileReadable = await isPathToReadableDir(userDataDirArg, args.profile);
   }
 
   const isCaseOne = !userDataDirArg;
@@ -275,10 +261,9 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     !isCaseTwo &&
     !isCaseThree &&
     isChromium &&
-    isUserDataDirExisting &&
-    isProfileReadable;
+    isUserDataDirExisting;
 
-  let validatedUserDataDir, validatedProfile;
+  let validatedUserDataDir;
   log.verbose("--user-data-dir validation");
   if (isCaseOne) {
     const tempDirPath = await mkdtempDisposable(join(tmpdir(), programName));
@@ -294,9 +279,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     assert(userDataDirArg);
     // validatedUserDataDir = join(userDataDirArg, args.profile);
     validatedUserDataDir = userDataDirArg;
-    validatedProfile = args.profile;
     log.verbose("\t", "- using user-data dir: ", validatedUserDataDir);
-    log.verbose("\t", "- with profile name: ", args.profile);
   } else {
     throw new Error(
       "Invalid --user-data-dir config.  Either must specify no " +
@@ -446,7 +429,6 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     measurements: mesToPerform,
     output: outputHandle,
     preservePages: preservePages,
-    profile: validatedProfile,
     seconds: args.seconds,
     timeout: args.timeout,
     url: args.url,

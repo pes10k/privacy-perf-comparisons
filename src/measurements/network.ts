@@ -28,12 +28,16 @@ interface Datapoint {
 }
 
 const getSecurityContext = async (frame: Frame): Promise<SecurityContext> => {
-  const response = await frame.evaluate("window.origin");
-  if (response === undefined) {
+  try {
+    const response = await frame.evaluate("window.origin");
+    if (response === undefined) {
+      return null;
+    }
+    assert(typeof response === "string");
+    return response;
+  } catch {
     return null;
   }
-  assert(typeof response === "string");
-  return response;
 };
 
 // This is only an approximation for a bunch of reasons, including

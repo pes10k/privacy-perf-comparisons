@@ -36,22 +36,17 @@ const launchOptionsDefault = (config: RunConfig): PersistentLaunchOptions => {
 const launchOptionsBrave = (config: RunConfig): PersistentLaunchOptions => {
   const options = launchOptionsChromium(config);
   options.args.push("--disable-brave-update");
-  options.args.push("--disable-sync");
   return options;
 };
 
 const launchOptionsChromium = (config: RunConfig): PersistentLaunchOptions => {
   const options = launchOptionsDefault(config);
-
-  // Playwright sets a *lot* of chromium flags by default. We don't want
-  // all of them. See:
-  // https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromiumSwitches.ts
-
   options.args.push("--disable-features=MacAppCodeSignClone");
-  if (config.profile) {
-    options.args.push(`--profile-directory="${config.profile}"`);
-  }
-  options.chromiumSandbox = false;
+  options.args.push("--enable-features=HttpsUpgrades");
+  options.ignoreDefaultArgs = [
+    "--disable-background-networking",
+    "--disable-extensions",
+  ];
   return options;
 };
 
@@ -121,5 +116,6 @@ export const launch = async (
   const userDataDir = config.userDataDir;
   logger.info("Launching with options: ", { ...opts, userDataDir });
   const context = await browser.launchPersistentContext(userDataDir, opts);
+  logger.info("...and launched.");
   return context;
 };

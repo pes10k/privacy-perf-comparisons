@@ -49,11 +49,6 @@ parser.add_argument("-o", "--output", {
         "If --output is called with a path that matches an existing file, or " +
         "a path where no file exists, the results will be written to that path.",
 });
-parser.add_argument("-p", "--profile", {
-    default: defaultArgs.profile,
-    help: "For Chromium, this is the name of the profile in an existing " +
-        "--user-data-dir directory to load. (Only used for Chromium browsers)",
-});
 parser.add_argument("-r", "--preserve-pages", {
     action: "store_true",
     default: defaultArgs.preservePages,
