@@ -39,13 +39,46 @@ const launchOptionsBrave = (config: RunConfig): PersistentLaunchOptions => {
   return options;
 };
 
+// Taken from
+// https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromiumSwitches.ts#L51
+const playwrightDisabledFeatures = [
+  // See https://github.com/microsoft/playwright/issues/14047
+  "AvoidUnnecessaryBeforeUnloadCheckSync",
+  // See https://github.com/microsoft/playwright/issues/38568
+  "BoundaryEventDispatchTracksNodeRemoval",
+  "DestroyProfileOnBrowserClose",
+  // See https://github.com/microsoft/playwright/pull/13854
+  "DialMediaRouteProvider",
+  "GlobalMediaControls",
+  // See https://github.com/microsoft/playwright/pull/27605
+  "HttpsUpgrades",
+  // Hides the Lens feature in the URL address bar. Its not working in unofficial builds.
+  "LensOverlay",
+  // See https://github.com/microsoft/playwright/pull/8162
+  "MediaRouter",
+  // See https://github.com/microsoft/playwright/issues/28023
+  "PaintHolding",
+  // See https://github.com/microsoft/playwright/issues/32230
+  "ThirdPartyStoragePartitioning",
+  // See https://github.com/microsoft/playwright/issues/16126
+  "Translate",
+  // See https://issues.chromium.org/u/1/issues/435410220
+  "AutoDeElevate",
+  // See https://github.com/microsoft/playwright/issues/37714
+  "RenderDocument",
+  // Prevents downloading optimization hints on startup.
+  "OptimizationHints",
+];
+
 const launchOptionsChromium = (config: RunConfig): PersistentLaunchOptions => {
   const options = launchOptionsDefault(config);
   options.args.push("--disable-features=MacAppCodeSignClone");
   options.args.push("--enable-features=HttpsUpgrades");
   options.ignoreDefaultArgs = [
     "--disable-background-networking",
+    "--disable-background-timer-throttling",
     "--disable-extensions",
+    "--disable-features=" + playwrightDisabledFeatures.join(","),
   ];
   return options;
 };
