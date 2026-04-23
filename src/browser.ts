@@ -20,7 +20,7 @@ const launchOptionsDefault = (config: RunConfig): PersistentLaunchOptions => {
   // 3. and then, enabling networking.
   const startInOfflineMode = !config.preservePages;
   return {
-    args: config.args ?? [],
+    args: [],
     executablePath: config.binary,
     headless: false,
     offline: startInOfflineMode,
@@ -124,6 +124,11 @@ const launchOptionsChromium = (config: RunConfig): PersistentLaunchOptions => {
     "--disable-extensions",
     "--disable-features=" + playwrightDisabledFeatures.join(","),
   ];
+  if (config.args) {
+    for (const anArg of config.args) {
+      options.args.push(anArg);
+    }
+  }
   return options;
 };
 

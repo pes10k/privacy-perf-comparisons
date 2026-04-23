@@ -9,7 +9,7 @@ const launchOptionsDefault = (config) => {
     // 3. and then, enabling networking.
     const startInOfflineMode = !config.preservePages;
     return {
-        args: config.args ?? [],
+        args: [],
         executablePath: config.binary,
         headless: false,
         offline: startInOfflineMode,
@@ -109,6 +109,11 @@ const launchOptionsChromium = (config) => {
         "--disable-extensions",
         "--disable-features=" + playwrightDisabledFeatures.join(","),
     ];
+    if (config.args) {
+        for (const anArg of config.args) {
+            options.args.push(anArg);
+        }
+    }
     return options;
 };
 const launchOptionsGecko = (config) => {
