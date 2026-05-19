@@ -421,7 +421,7 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   }
 
   return {
-    args: additionalArgs,
+    chromiumArgs: additionalArgs,
     binary: binaryPath,
     browser: browserType,
     firefoxUserPrefs: firefoxPrefs,

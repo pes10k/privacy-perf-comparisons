@@ -8,6 +8,7 @@ export type Path = string;
 export type Serializable = unknown;
 export type VersionNumber = string;
 export type WSFrame = string | Buffer;
+export type ChromiumArg = string;
 export type FirefoxUserPrefs = Record<string, string | number | boolean>;
 
 export interface PersistentLaunchOptions extends LaunchOptions {
@@ -42,7 +43,7 @@ export interface Report {
 }
 
 export interface RunConfig {
-  args?: string[];
+  chromiumArgs?: ChromiumArg[];
   binary: Path;
   browser: BrowserType;
   firefoxUserPrefs?: FirefoxUserPrefs;

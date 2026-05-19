@@ -110,7 +110,7 @@ parser.add_argument("-f", "--firefox-user-prefs", {
 });
 parser.add_argument("-a", "--args", {
   help:
-    "Additional arguments that are passed along to the shell when " +
+    "Additional Chromium arguments that are passed along to the shell when " +
     "launching the browser. So, to pass the argument '--disable-features=x' " +
     "to the browser, pass '--args disable-features=x'.",
   nargs: "*",

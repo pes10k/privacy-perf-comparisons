@@ -338,7 +338,7 @@ export const runConfigForArgs = async (args) => {
         }
     }
     return {
-        args: additionalArgs,
+        chromiumArgs: additionalArgs,
         binary: binaryPath,
         browser: browserType,
         firefoxUserPrefs: firefoxPrefs,

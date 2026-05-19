@@ -92,7 +92,7 @@ parser.add_argument("-f", "--firefox-user-prefs", {
         "is 'gecko'.",
 });
 parser.add_argument("-a", "--args", {
-    help: "Additional arguments that are passed along to the shell when " +
+    help: "Additional Chromium arguments that are passed along to the shell when " +
         "launching the browser. So, to pass the argument '--disable-features=x' " +
         "to the browser, pass '--args disable-features=x'.",
     nargs: "*",
