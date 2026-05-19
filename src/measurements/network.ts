@@ -114,8 +114,8 @@ const getRequestSize = async (
     const totalSize = bodySize + headerSize;
     dLog("Request.sizes(): ", bodySize, headerSize);
     return totalSize;
-  } catch (err) {
-    eLog("Request.sizes(): ", err);
+  } catch {
+    // pass
   }
 
   try {
@@ -146,8 +146,8 @@ const getResponseSize = async (
     const totalSize = bodySize + headerSize;
     dLog("Request.sizes(): ", bodySize, headerSize);
     return totalSize;
-  } catch (err) {
-    eLog("Request.sizes(): ", err);
+  } catch {
+    // pass
   }
 
   try {

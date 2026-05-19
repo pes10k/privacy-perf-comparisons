@@ -64,8 +64,15 @@ const launchOptionsChromium = (config) => {
     options.ignoreDefaultArgs = [
         "--disable-background-networking",
         "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-client-side-phishing-detection",
+        "--disable-component-extensions-with-background-pages",
+        "--disable-component-update",
         "--disable-extensions",
         "--disable-features=" + playwrightDisabledFeatures.join(","),
+        "--disable-hang-monitor",
+        "--disable-ipc-flooding-protection",
+        "--disable-renderer-backgrounding",
     ];
     if (config.chromiumArgs) {
         options.args = options.args.concat(config.chromiumArgs);

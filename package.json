@@ -1,6 +1,6 @@
 {
   "name": "browser-perf-logger",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Automated, cross-browser measurements of performance.",
   "license": "ISC",
   "author": "Peter Snyder <pes@brave.com>",
@@ -20,7 +20,7 @@
     "@eslint/js": "^9.39.2",
     "@tsconfig/node24": "^24.0.3",
     "@types/argparse": "^2.0.17",
-    "@types/node": "^25.0.3",
+    "@types/node": "^25.9.0",
     "@types/pidusage": "^2.0.5",
     "@types/ps-tree": "^1.1.6",
     "@types/web": "^0.0.336",

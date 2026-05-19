@@ -1,6 +1,19 @@
 Browser Perf Logger
 ===
 
+0.2.7
+---
+
+Remove additional Chromium flags that playwright passes by default which
+can have unexpected and unintended performance impact. Most importantly,
+prevent playwright from passing `--disable-component-update`, which disables
+Brave's content filtering features.
+
+Remove some not-useful logging from the default configuration.
+
+Update `tsconfig.json` to define `rootDir`.
+
+
 0.2.6
 ---
 
