@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 import { BrowserType, MeasurementType, } from "./types.js";
 import { getLogger, LoggingLevel } from "./logging.js";
+import { classForType } from "./measurements/structure/mapping.js";
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
@@ -15,6 +16,7 @@ export const defaultLaunchArgs = () => {
         measurements: Object.values(MeasurementType),
         preservePages: false,
         seconds: 30,
+        shouldDropPermissions: true,
         timeout: 30,
         viewport: {
             height: 720,
@@ -289,25 +291,6 @@ export const runConfigForArgs = async (args) => {
         assert(Object.values(MeasurementType).includes(measurementType));
         mesToPerform.push(measurementType);
     }
-    // Only some measurements require the playwright-modified binaries; some
-    // tests will run fine even in stock versions of Firefox, Safari, etc.
-    // Here we check 1. if any of the measurements we're about to run (specified
-    // with --measurements) require the capabilities that playwright patches into
-    // Gecko and WebKit, and 2. if it looks like the binary we're about to run
-    // those measurements (specified with --binary-path) includes those
-    // capabilities.
-    const mesRequiringExt = new Set([MeasurementType.Network]);
-    const doMesRequireExt = new Set(mesToPerform).intersection(mesRequiringExt).size > 0;
-    const doesBrowserSupportExt = isChromium || isUsingPlaywrightBinary;
-    if (doMesRequireExt && !doesBrowserSupportExt) {
-        if (!shouldIgnoreConfChecks()) {
-            throw new Error("The specified measurements cannot be run in the " +
-                "specified browser. These measurements require either a Chromium " +
-                "browser, or a browser including the playwright patches.\n\n" +
-                "If you think this is incorrect, you can override this check with " +
-                `${ignoreConfChecksEnvVarName}=1`);
-        }
-    }
     assert(typeof args.height === "number");
     assert(typeof args.width === "number");
     assert(typeof args.seconds === "number");
@@ -337,16 +320,19 @@ export const runConfigForArgs = async (args) => {
                 err.toString());
         }
     }
-    return {
+    assert(typeof args.do_not_drop === "boolean");
+    const config = {
         chromiumArgs: additionalArgs,
         binary: binaryPath,
         browser: browserType,
         firefoxUserPrefs: firefoxPrefs,
+        isUsingPlaywrightBinary,
         loggingLevel: loggingLevel,
         measurements: mesToPerform,
         output: outputHandle,
         preservePages: preservePages,
         seconds: args.seconds,
+        shouldDropPermissions: !args.do_not_drop,
         timeout: args.timeout,
         url: args.url,
         userDataDir: validatedUserDataDir,
@@ -355,5 +341,20 @@ export const runConfigForArgs = async (args) => {
             width: args.width,
         },
     };
+    if (!shouldIgnoreConfChecks()) {
+        try {
+            for (const aMeasurementType of config.measurements) {
+                const aMeasurementClass = classForType(aMeasurementType);
+                await aMeasurementClass.validate(config);
+            }
+        }
+        catch (err) {
+            const errMsg = `Measurement validation error: ${String(err)}\n\n` +
+                "If you think this is incorrect, you can override this check with " +
+                `${ignoreConfChecksEnvVarName}=1`;
+            throw new Error(errMsg);
+        }
+    }
+    return config;
 };
 //# sourceMappingURL=config.js.map

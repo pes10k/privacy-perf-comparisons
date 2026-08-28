@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { BaseMeasurer } from "./base.js";
+import { BaseMeasurer } from "./structure/base.js";
 import { LoggingLevel } from "../logging.js";
-import { MeasurementType } from "../types.js";
+import { BrowserType, MeasurementType, } from "../types.js";
 const getSecurityContext = async (frame) => {
     try {
         const response = await frame.evaluate("window.origin");
@@ -298,6 +298,26 @@ class ContextNetworkLogger {
 export class NetworkMeasurer extends BaseMeasurer {
     type = MeasurementType.Network;
     #netLogger;
+    // eslint-disable-next-line @typescript-eslint/require-await
+    static async validate(config) {
+        // Only some measurements require the playwright-modified binaries; some
+        // tests will run fine even in stock versions of Firefox, Safari, etc.
+        // Here we check 1. if any of the measurements we're about to run (specified
+        // with --measurements) require the capabilities that playwright patches into
+        // Gecko and WebKit, and 2. if it looks like the binary we're about to run
+        // those measurements (specified with --binary-path) includes those
+        // capabilities.
+        if (config.browser === BrowserType.Brave ||
+            config.browser === BrowserType.Chromium) {
+            return;
+        }
+        if (config.isUsingPlaywrightBinary) {
+            return;
+        }
+        throw new Error("The specified measurements cannot be run in the " +
+            "specified browser. These measurements require either a Chromium " +
+            "browser, or a browser including the playwright patches.");
+    }
     constructor(logger, url, context) {
         super(logger, url, context);
         this.#netLogger = new ContextNetworkLogger(logger);
@@ -329,8 +349,8 @@ export class NetworkMeasurer extends BaseMeasurer {
             }
         });
     }
-    instrumentContext() {
-        super.instrumentContext();
+    async instrumentContext() {
+        await super.instrumentContext();
         this.context.on("page", (page) => {
             this.#instrumentPage(page);
         });

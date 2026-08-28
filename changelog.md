@@ -1,6 +1,11 @@
 Browser Perf Logger
 ===
 
+0.3.0
+---
+
+Add `power` measurement.
+
 0.2.7
 ---
 

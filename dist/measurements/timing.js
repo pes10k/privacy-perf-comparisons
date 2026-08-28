@@ -1,4 +1,4 @@
-import { BaseMeasurer } from "./base.js";
+import { BaseMeasurer } from "./structure/base.js";
 import { MeasurementType } from "../types.js";
 const injected_getPageMeasurements = () => {
     return new Promise((resolve) => {

@@ -1,4 +1,4 @@
-import { BaseMeasurer, MeasurementResult } from "./base.js";
+import { BaseMeasurer, MeasurementResult } from "./structure/base.js";
 import { MeasurementType, Serializable } from "../types.js";
 
 const injected_getPageMeasurements = (): Promise<Serializable> => {

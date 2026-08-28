@@ -10,8 +10,8 @@ import {
 import { launch } from "./browser.js";
 import { defaultLaunchArgs, getVersion, runConfigForArgs } from "./config.js";
 import { getLogger, LoggingLevel } from "./logging.js";
-import { measureURL } from "./measure.js";
 import { BrowserType, MeasurementType } from "./types.js";
+import { Pipeline } from "./pipeline.js";
 
 const isDebugMode = process.env.PERF_TESTS_DEBUG === "1";
 const defaultArgs = defaultLaunchArgs();
@@ -35,6 +35,13 @@ parser.add_argument("-d", "--user-data-dir", {
     "*Note:* Gecko/Firefox measurements should use this flag for " +
     "specifying the path for storing persistent user data (and not " +
     "--profile).",
+});
+parser.add_argument("--do-not-drop", {
+  action: "store_true",
+  default: !defaultArgs.shouldDropPermissions,
+  help:
+    "If passed, disable the default behavior of dropping permissions if " +
+    "it looks like we're being run with sudo.",
 });
 parser.add_argument("-l", "--logging", {
   choices: Object.values(LoggingLevel),
@@ -132,19 +139,11 @@ try {
   assert(rawArgs instanceof Namespace);
 
   const runConfig = await runConfigForArgs(rawArgs);
-  const { measurements, url, seconds, timeout } = runConfig;
-  const { loggingLevel, preservePages } = runConfig;
-  const logger = getLogger(isDebugMode ? LoggingLevel.Verbose : loggingLevel);
+  const logLevel = isDebugMode ? LoggingLevel.Verbose : runConfig.loggingLevel;
+  const logger = getLogger(logLevel);
   const browserContext = await launch(logger, runConfig);
-  const results = await measureURL(
-    logger,
-    browserContext,
-    url,
-    seconds,
-    timeout,
-    measurements,
-    preservePages,
-  );
+  const pipeline = new Pipeline(logger, browserContext, runConfig);
+  const results = await pipeline.measure(runConfig.url);
 
   runConfig.output.write(JSON.stringify(results), "utf8", () => {
     process.exit(0);

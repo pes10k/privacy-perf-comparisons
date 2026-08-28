@@ -31,6 +31,7 @@ export enum BrowserType {
 export enum MeasurementType {
   MemoryCPU = "memory-cpu",
   Network = "network",
+  Power = "power",
   Timing = "timing",
 }
 
@@ -39,7 +40,7 @@ export interface Report {
   start: Date;
   end: Date;
   version: VersionNumber;
-  measurements: Record<MeasurementType, unknown>;
+  measurements: Partial<Record<MeasurementType, unknown>>;
 }
 
 export interface RunConfig {
@@ -47,11 +48,13 @@ export interface RunConfig {
   binary: Path;
   browser: BrowserType;
   firefoxUserPrefs?: FirefoxUserPrefs;
+  isUsingPlaywrightBinary: boolean;
   loggingLevel: LoggingLevel;
   measurements: MeasurementType[];
   output: Writable;
   preservePages: boolean;
   seconds: number;
+  shouldDropPermissions: boolean;
   timeout: number;
   url: URL;
   userDataDir: Path;

@@ -1,7 +1,7 @@
 import pidusage from "pidusage";
 import psTree, { PS } from "ps-tree";
 
-import { BaseMeasurer, MeasurementResult } from "./base.js";
+import { BaseMeasurer, MeasurementResult } from "./structure/base.js";
 import { MeasurementType } from "../types.js";
 import { Logger } from "../logging.js";
 import { BrowserContext } from "@playwright/test";
@@ -167,7 +167,8 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
     this.#measurements.push(datapoint);
   }
 
-  start(): undefined {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async start(): Promise<undefined> {
     const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:start(): ");
     this.#intervalId = setInterval(() => {
       getDatapoint(logger, this.#pid, "during")
@@ -180,7 +181,7 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
     }, MemoryCPUMeasurer.intervalMs);
   }
 
-  close(): boolean {
+  async close(): Promise<boolean> {
     if (!this.#intervalId) {
       throw new Error("MemoryCPUMeasurer: closed measurer that wasn't started");
     }

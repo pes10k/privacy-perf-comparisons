@@ -1,6 +1,6 @@
 import pidusage from "pidusage";
 import psTree from "ps-tree";
-import { BaseMeasurer } from "./base.js";
+import { BaseMeasurer } from "./structure/base.js";
 import { MeasurementType } from "../types.js";
 const processUsage = async (pid) => {
     return new Promise((resolve, reject) => {
@@ -122,7 +122,8 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
         const datapoint = await getDatapoint(log, this.#pid, "before");
         this.#measurements.push(datapoint);
     }
-    start() {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    async start() {
         const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:start(): ");
         this.#intervalId = setInterval(() => {
             getDatapoint(logger, this.#pid, "during")
@@ -134,7 +135,7 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
             });
         }, MemoryCPUMeasurer.intervalMs);
     }
-    close() {
+    async close() {
         if (!this.#intervalId) {
             throw new Error("MemoryCPUMeasurer: closed measurer that wasn't started");
         }

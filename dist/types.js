@@ -9,6 +9,7 @@ export var MeasurementType;
 (function (MeasurementType) {
     MeasurementType["MemoryCPU"] = "memory-cpu";
     MeasurementType["Network"] = "network";
+    MeasurementType["Power"] = "power";
     MeasurementType["Timing"] = "timing";
 })(MeasurementType || (MeasurementType = {}));
 //# sourceMappingURL=types.js.map
