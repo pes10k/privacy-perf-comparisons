@@ -291,16 +291,11 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
   }
   assert(validatedUserDataDir);
 
-  // We only allow the `binary` argument for Chromium-family browsers,
-  // since we can do our measurements on the "stock" versions of these.
-  // For Gecko and WebKit browsers, these require the playwright patches
-  // for our measurements to succeed, and so we necessarily have to use
-  // the playwright provided ones.
   let binaryPath: Path | undefined;
+  let isUsingPlaywrightBinary = false;
 
   // If we weren't passed a path to a browser binary, use the paths to the
-  // playwright binaries.
-  let isUsingPlaywrightBinary = false;
+  // playwright-managed binaries.
   if (args.binary_path === undefined) {
     switch (args.browser) {
       case BrowserType.Brave:
@@ -323,7 +318,15 @@ export const runConfigForArgs = async (args: Namespace): Promise<RunConfig> => {
     }
   } else {
     assert(typeof args.binary_path === "string");
-    if (!(await isPathToExecFile(args.binary_path))) {
+    if (args.browser === BrowserType.WebKit) {
+      if (!(await isPathToDir(args.binary_path))) {
+        throw new Error(
+          `Invalid --binary-path "${args.binary_path}". For 'webkit', this ` +
+            "argument should be the path to an app bundle directory (e.g., " +
+            "Playwright.app).",
+        );
+      }
+    } else if (!(await isPathToExecFile(args.binary_path))) {
       throw new Error(
         `Invalid binary path. "${args.binary_path}" is not an ` +
           "executable file.",

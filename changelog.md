@@ -1,6 +1,11 @@
 Browser Perf Logger
 ===
 
+0.2.8
+---
+
+Add modified webkit support.
+
 0.2.7
 ---
 

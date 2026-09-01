@@ -96,10 +96,11 @@ parser.add_argument("-v", "--version", {
 });
 parser.add_argument("-x", "--binary-path", {
   help:
-    "Path to the browser binary to run the measurements with. Note that " +
-    "this argument is only valid for Chromium-family browsers, since " +
-    "Chromium family browsers do not require any playwright patches, " +
-    "while the gecko and webkit ones do.",
+    "Path to the browser binary to run the measurements with. For Webkit, " +
+    "this argument should be the path to the '.app' directory (in a WebKit " +
+    "build, this will be something like './Release/Playwright.app'.) " +
+    "For other browsers this should be the path to the browser's actual " +
+    "executable.",
 });
 parser.add_argument("-f", "--firefox-user-prefs", {
   help:
