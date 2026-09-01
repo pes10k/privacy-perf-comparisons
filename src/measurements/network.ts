@@ -409,7 +409,7 @@ export class NetworkMeasurer extends BaseMeasurer {
   readonly #netLogger: ContextNetworkLogger;
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  static async validate(config: RunConfig): Promise<undefined> {
+  static override async validate(config: RunConfig): Promise<undefined> {
     // Only some measurements require the playwright-modified binaries; some
     // tests will run fine even in stock versions of Firefox, Safari, etc.
     // Here we check 1. if any of the measurements we're about to run (specified
@@ -472,7 +472,7 @@ export class NetworkMeasurer extends BaseMeasurer {
     });
   }
 
-  async instrumentContext(): Promise<undefined> {
+  override async instrumentContext(): Promise<undefined> {
     await super.instrumentContext();
     this.context.on("page", (page: Page) => {
       this.#instrumentPage(page);
@@ -483,7 +483,7 @@ export class NetworkMeasurer extends BaseMeasurer {
   // other classes implementations can await/async if needed.
   //
   // eslint-disable-next-line @typescript-eslint/require-await
-  async collect(): Promise<MeasurementResult | null> {
+  override async collect(): Promise<MeasurementResult | null> {
     this.closeIfOpen();
     return {
       type: this.type,

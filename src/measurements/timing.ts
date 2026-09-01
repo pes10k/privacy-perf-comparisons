@@ -24,7 +24,7 @@ const injected_getPageMeasurements = (): Promise<Serializable> => {
 export class TimingMeasurer extends BaseMeasurer {
   readonly type = MeasurementType.Timing;
 
-  async collect(): Promise<MeasurementResult | null> {
+  override async collect(): Promise<MeasurementResult | null> {
     if (this.isContextClosed) {
       this.logInfo("Tried to collect results from a closed browser context");
       return null;

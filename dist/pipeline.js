@@ -8,6 +8,7 @@ const PipelineStep = {
     Close: "close",
     Collect: "collect",
 };
+const eventDrainTimeMs = 5 * 1000;
 export class Pipeline {
     #context;
     #logger;
@@ -28,6 +29,7 @@ export class Pipeline {
         this.#timeout = config.timeout;
     }
     async measure(url) {
+        const log = this.#logger;
         // Unless we're preserving existing pages, we need to force things to
         // start in a clean profile by closing all open pages, and then
         // re-enabling networking .
@@ -42,7 +44,6 @@ export class Pipeline {
         await this.#runStep(PipelineStep.InstrumentContext);
         await this.#runStep(PipelineStep.BeforeStart);
         await this.#runStep(PipelineStep.Start);
-        const log = this.#logger;
         log.verbose("Creating empty page (i.e., new tab).");
         const page = await this.#context.newPage();
         const startTime = new Date();
@@ -53,18 +54,15 @@ export class Pipeline {
         });
         assert(navRequest);
         log.info(`Arrived at url="${page.url()}"`);
-        log.info(`Letting page load for "${String(this.#seconds)}" seconds`);
+        log.verbose(`Letting page load for "${String(this.#seconds)}" seconds`);
         await page.waitForTimeout(this.#seconds * 1000);
         await this.#runStep(PipelineStep.Close);
-        const eventDrainTimeMs = 5 * 1000;
-        log.verbose(`Waiting "${String(eventDrainTimeMs)}ms" for events 'in-the-air' to ` +
-            "complete. (Note, they are not include in measurement amounts)");
         await page.waitForTimeout(eventDrainTimeMs);
-        const collectResults = await this.#runStep(PipelineStep.Collect);
+        const results = await this.#runStep(PipelineStep.Collect);
         await this.#context.close();
         return {
             end: new Date(),
-            measurements: collectResults,
+            measurements: results,
             start: startTime,
             url: url,
             version: await getVersion(),

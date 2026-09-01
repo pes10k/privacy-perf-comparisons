@@ -6,6 +6,7 @@ import { chromium, firefox, webkit } from "playwright";
 import { BrowserType, MeasurementType, } from "./types.js";
 import { getLogger, LoggingLevel } from "./logging.js";
 import { classForType } from "./measurements/structure/mapping.js";
+import { indent } from "./utils.js";
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
@@ -234,11 +235,6 @@ export const runConfigForArgs = async (args) => {
             "chromium).");
     }
     assert(validatedUserDataDir);
-    // We only allow the `binary` argument for Chromium-family browsers,
-    // since we can do our measurements on the "stock" versions of these.
-    // For Gecko and WebKit browsers, these require the playwright patches
-    // for our measurements to succeed, and so we necessarily have to use
-    // the playwright provided ones.
     let binaryPath;
     // If we weren't passed a path to a browser binary, use the paths to the
     // playwright binaries.
@@ -342,14 +338,17 @@ export const runConfigForArgs = async (args) => {
         },
     };
     if (!shouldIgnoreConfChecks()) {
+        let aType;
         try {
-            for (const aMeasurementType of config.measurements) {
-                const aMeasurementClass = classForType(aMeasurementType);
+            for (aType of config.measurements) {
+                const aMeasurementClass = classForType(aType);
                 await aMeasurementClass.validate(config);
             }
         }
         catch (err) {
-            const errMsg = `Measurement validation error: ${String(err)}\n\n` +
+            const errMsg = `Validation error with for measurement '${String(aType)}':\n\n` +
+                indent(String(err)) +
+                "\n" +
                 "If you think this is incorrect, you can override this check with " +
                 `${ignoreConfChecksEnvVarName}=1`;
             throw new Error(errMsg);

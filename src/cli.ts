@@ -102,11 +102,7 @@ parser.add_argument("-v", "--version", {
   version: await getVersion(),
 });
 parser.add_argument("-x", "--binary-path", {
-  help:
-    "Path to the browser binary to run the measurements with. Note that " +
-    "this argument is only valid for Chromium-family browsers, since " +
-    "Chromium family browsers do not require any playwright patches, " +
-    "while the gecko and webkit ones do.",
+  help: "Path to the browser binary to run the measurements with.",
 });
 parser.add_argument("-f", "--firefox-user-prefs", {
   help:

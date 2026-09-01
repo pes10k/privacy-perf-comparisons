@@ -161,14 +161,14 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
     this.#pid = process.pid;
   }
 
-  async beforeStart(): Promise<undefined> {
+  override async beforeStart(): Promise<undefined> {
     const log = this.logger.prefixedLogger("MemoryCPUMeasurer:beforeStart(): ");
     const datapoint = await getDatapoint(log, this.#pid, "before");
     this.#measurements.push(datapoint);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
-  async start(): Promise<undefined> {
+  override async start(): Promise<undefined> {
     const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:start(): ");
     this.#intervalId = setInterval(() => {
       getDatapoint(logger, this.#pid, "during")
@@ -181,7 +181,7 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
     }, MemoryCPUMeasurer.intervalMs);
   }
 
-  async close(): Promise<boolean> {
+  override async close(): Promise<boolean> {
     if (!this.#intervalId) {
       throw new Error("MemoryCPUMeasurer: closed measurer that wasn't started");
     }
@@ -189,7 +189,7 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
     return super.close();
   }
 
-  async collect(): Promise<MeasurementResult | null> {
+  override async collect(): Promise<MeasurementResult | null> {
     const logger = this.logger.prefixedLogger("MemoryCPUMeasurer:collect(): ");
     const datapoint = await getDatapoint(logger, this.#pid, "end");
     this.#measurements.push(datapoint);
