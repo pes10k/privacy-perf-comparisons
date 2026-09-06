@@ -1,4 +1,5 @@
 export class BaseMeasurer {
+    config;
     context;
     logger;
     url;
@@ -13,7 +14,8 @@ export class BaseMeasurer {
     static async validate(config) {
         // pass
     }
-    constructor(logger, url, context) {
+    constructor(logger, url, context, config) {
+        this.config = config;
         this.logger = logger;
         this.url = url;
         this.context = context;

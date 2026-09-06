@@ -7,13 +7,21 @@ import psTree from "ps-tree";
 
 import { Logger } from "../logging.js";
 import { BaseMeasurer, MeasurementResult } from "./structure/base.js";
-import { MeasurementType } from "../types.js";
+import { MeasurementType, RunConfig } from "../types.js";
+import { canDropSudoLevels, dropSudoLevels } from "../utils.js";
 
 type PID = number;
 type COMMAND = string;
 
 type Range = [number, number | undefined];
 type FrameParser = (text: string) => Datapoint | undefined;
+
+interface ProcessInfo {
+  PPID: string;
+  PID: string;
+  STAT: string;
+  COMM: string;
+}
 
 interface Datapoint {
   pid: PID;
@@ -22,11 +30,18 @@ interface Datapoint {
   gpu: number;
 }
 
-const powerUtil = "powermetrics";
+interface ProcessTotal {
+  pid: PID;
+  command: COMMAND;
+  energy: number;
+  gpu: number;
+}
 
+const powerUtil = "powermetrics";
+const samplingInterval = "350";
 const sampleEnd = "ALL_TASKS ";
 const headerRegex =
-  /Name[ ]+(<id_col>ID[ ]+).*(<gpu_col>GPU ms\/s[ ]+)Energy Impact/d;
+  /Name[ ]+(?<id_col>ID[ ]+).*(?<gpu_col>GPU ms\/s[ ]+)Energy Impact/d;
 
 const isEndOfSample = (line: string): boolean => {
   return line.startsWith(sampleEnd);
@@ -53,7 +68,7 @@ const buildFrameParser = (line: string): FrameParser | undefined => {
       return undefined;
     }
 
-    const idValue = parseInt(line.substring(0, idColWidth[1]), 10);
+    const idValue = parseInt(line.substring(idColWidth[0], idColWidth[1]), 10);
 
     const gpuText = line.substring(gpuColWidth[0], gpuColWidth[1]);
     const gpuValue = Number.parseFloat(gpuText);
@@ -76,20 +91,37 @@ export class PowerMeasurer extends BaseMeasurer {
 
   #powermetricsProcess?: ChildProcess;
 
-  static override async validate(): Promise<undefined> {
+  static override async validate(config: RunConfig): Promise<undefined> {
     return new Promise((resolve, reject) => {
+      // Just a throw-away quick-run set of commands to test if we can
+      // run the tool at all.
       exec(`${powerUtil} -n 1 -i 100`, (error) => {
         if (error) {
           reject(error);
           return;
         }
-        resolve(undefined);
+
+        if (config.shouldDropPermissions && !canDropSudoLevels()) {
+          const err = new Error(
+            "Unable to automatically drop permission, could not find ENV " +
+              `variables SUDO_UID='${String(process.env.SUDO_UID)}' and ` +
+              `SUDO_GID='${String(process.env.SUDO_GID)}'.`,
+          );
+          reject(err);
+        } else {
+          resolve(undefined);
+        }
       });
     });
   }
 
-  constructor(logger: Logger, url: URL, context: BrowserContext) {
-    super(logger, url, context);
+  constructor(
+    logger: Logger,
+    url: URL,
+    context: BrowserContext,
+    config: RunConfig,
+  ) {
+    super(logger, url, context, config);
     this.#browserPids = new Map<PID, COMMAND>();
     this.#datapoints = new Map<PID, Datapoint[]>();
   }
@@ -97,7 +129,7 @@ export class PowerMeasurer extends BaseMeasurer {
   override async beforeLaunch(): Promise<undefined> {
     const powerUtilArgs = [
       "-i",
-      "500",
+      samplingInterval,
       "--samplers",
       "tasks",
       "--show-process-energy",
@@ -106,9 +138,10 @@ export class PowerMeasurer extends BaseMeasurer {
 
     return new Promise((resolve, reject) => {
       const childProcess = spawn(powerUtil, powerUtilArgs);
-      childProcess.stdout.on("data", (data: string) => {
+      childProcess.stdout.on("data", (data: unknown) => {
         let frameParser: FrameParser | undefined;
-        for (const aLine of data.split(EOL)) {
+        const parts = String(data).split(EOL);
+        for (const aLine of parts) {
           if (!frameParser) {
             frameParser = buildFrameParser(aLine);
             continue;
@@ -136,13 +169,30 @@ export class PowerMeasurer extends BaseMeasurer {
         }
       });
 
-      if (childProcess.pid) {
-        this.#powermetricsProcess = childProcess;
-        resolve(undefined);
-      } else {
+      if (!childProcess.pid) {
         const msg = `Error launching: ${powerUtil} ` + powerUtilArgs.join(" ");
         reject(new Error(msg));
+        return;
       }
+
+      this.#powermetricsProcess = childProcess;
+      if (this.config.shouldDropPermissions) {
+        this.logVerbose("About to drop permissions...");
+        const dropResult = dropSudoLevels();
+        if (!dropResult?.success) {
+          reject(new Error("Error dropping permissions"));
+          return;
+        }
+
+        this.logVerbose(
+          "...successfully dropped. From " +
+            `UID='${String(dropResult.prev.uid)}', ` +
+            `GID='${String(dropResult.prev.gid)}` +
+            ` to UID='${String(dropResult.current.uid)}', ` +
+            `GID='${String(dropResult.current.uid)}'`,
+        );
+      }
+      resolve(undefined);
     });
   }
 
@@ -165,7 +215,8 @@ export class PowerMeasurer extends BaseMeasurer {
           return;
         }
 
-        for (const aChild of children) {
+        for (const aChildPoint of children) {
+          const aChild = aChildPoint as unknown as ProcessInfo;
           const childPid = parseInt(aChild.PID, 10);
           if (childPid === powermetricsPid) {
             continue;
@@ -177,15 +228,12 @@ export class PowerMeasurer extends BaseMeasurer {
             continue;
           }
 
-          this.#browserPids.set(childPid, aChild.COMMAND);
+          this.#browserPids.set(childPid, aChild.COMM);
         }
 
         if (this.#browserPids.size === 0) {
           this.logError("Could not find the process ids for the browser.");
-          this.logError(
-            "Child processes: ",
-            children.map((x) => x.COMMAND),
-          );
+          this.logError("Child processes: ", children);
           reject(new Error("Could not find browser process id(s)"));
           return;
         }
@@ -196,6 +244,43 @@ export class PowerMeasurer extends BaseMeasurer {
   }
 
   override collect(): Promise<MeasurementResult | null> {
-    throw new Error("Method not implemented.");
+    const processTotals: Record<PID, ProcessTotal> = {};
+    let powerTotal = 0.0;
+    let gpuTotal = 0.0;
+
+    for (const [aPid, processName] of this.#browserPids.entries()) {
+      // for (const [aPid, datapoints] of this.#datapoints.entries()) {
+      const processTotal: ProcessTotal = {
+        pid: aPid,
+        command: processName,
+        energy: 0,
+        gpu: 0,
+      };
+
+      const datapoints = this.#datapoints.get(aPid);
+      if (datapoints) {
+        for (const aDatapoint of datapoints) {
+          processTotal.energy += aDatapoint.energy;
+          processTotal.gpu += aDatapoint.gpu;
+        }
+
+        processTotals[aPid] = processTotal;
+        powerTotal += processTotal.energy;
+        gpuTotal += processTotal.gpu;
+      }
+    }
+
+    const result = {
+      type: MeasurementType.Power,
+      data: {
+        processes: processTotals,
+        totals: {
+          power: powerTotal,
+          gpu: gpuTotal,
+        },
+      },
+    };
+
+    return Promise.resolve(result);
   }
 }

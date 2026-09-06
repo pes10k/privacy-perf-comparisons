@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { access, constants, mkdtempDisposable, open, readFile, stat, } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 import { BrowserType, MeasurementType, } from "./types.js";
 import { getLogger, LoggingLevel } from "./logging.js";
@@ -10,11 +10,27 @@ import { indent } from "./utils.js";
 const { R_OK, W_OK, X_OK } = constants;
 const programName = "privacy-perf-comparisons";
 const validSchemes = ["http:", "https:"];
+const webkitSubPaths = {
+    binary: [
+        "WebKitBuild",
+        "Release",
+        "Playwright.app",
+        "Contents",
+        "MacOS",
+        "Playwright",
+    ],
+    releaseDir: ["WebKitBuild", "Release"],
+};
 export const defaultLaunchArgs = () => {
     return {
         browser: BrowserType.Chromium,
         loggingLevel: LoggingLevel.Info,
-        measurements: Object.values(MeasurementType),
+        measurements: [
+            MeasurementType.MemoryCPU,
+            MeasurementType.Network,
+            MeasurementType.Power,
+            MeasurementType.Timing,
+        ],
         preservePages: false,
         seconds: 30,
         shouldDropPermissions: true,
@@ -115,6 +131,40 @@ const shouldIgnoreConfChecks = () => {
     }
     return false;
 };
+const getWebkitBuildPaths = async (args) => {
+    if (args.webkit_build === undefined) {
+        return undefined;
+    }
+    const wkBuildDir = normalize(String(args.webkit_build));
+    const webkitPaths = {
+        binary: join(wkBuildDir, ...webkitSubPaths.binary),
+        releaseDir: join(wkBuildDir, ...webkitSubPaths.releaseDir),
+        rootDir: wkBuildDir,
+    };
+    if (!(await isPathToReadableDir(wkBuildDir))) {
+        throw new Error("Arg for --webkit-build (-w) is not a readable directory: " + wkBuildDir);
+    }
+    if (args.browser !== BrowserType.WebKit) {
+        throw new Error("The --webkit-build-dir (-w) argument can only be used when the " +
+            "--browser (-b) argument is 'webkit', but received " +
+            `'${String(args.browser)}'.`);
+    }
+    if (args.binary_path !== undefined) {
+        throw new Error("Cannot use the --webkit-build (-w) argument and the --binary (-x) " +
+            "argument at the same time.");
+    }
+    if (!(await isPathToReadableDir(webkitPaths.releaseDir))) {
+        throw new Error("The given --webkit-build (-w) directory does not have the expected " +
+            "structure. Expected to have a readable directory at " +
+            `'${webkitPaths.releaseDir}'.`);
+    }
+    if (!(await isPathToExecFile(webkitPaths.binary))) {
+        throw new Error("The given --webkit-build (-w) directory does not have the expected " +
+            "structure. Expected to have an executable file at " +
+            `'${webkitPaths.binary}'.`);
+    }
+    return webkitPaths;
+};
 // Generate the stream to write results to. This might be a stream for
 // a location on disk to write results to, or it might be STDOUT.
 //
@@ -126,28 +176,28 @@ const shouldIgnoreConfChecks = () => {
 // - if the output argument matches a directory on disk, then we generate
 //   a filename based on the initial URL being measured, and write to that file
 // - Otherwise, try to write results to the given path.
-const handleForResults = async (output, url) => {
+const makeOutputHandle = async (outputArg, url) => {
     // Case 1, in the function docblock: write to stdout.
-    if (output === undefined || output.trim().length === 0 || output === "-") {
+    if (outputArg === undefined || outputArg.trim() === "" || outputArg === "-") {
         return process.stdout;
     }
     // Case 2 in the function docblock: write to given path.
-    if (await isPathToFile(output)) {
-        if (!(await isPathToWritableFile(output))) {
-            throw new Error(`--output path is not writeable: "${output}"`);
+    if (await isPathToFile(outputArg)) {
+        if (!(await isPathToWritableFile(outputArg))) {
+            throw new Error(`--output path is not writeable: "${outputArg}"`);
         }
-        return (await open(output, "w")).createWriteStream();
+        return (await open(outputArg, "w")).createWriteStream();
     }
     // Case 3 in function docblock: write to file in given directory.
-    if (await isPathToDir(output)) {
-        if (!(await isPathToWriteableDir(output))) {
-            throw new Error(`--output directory is not writeable: "${output}"`);
+    if (await isPathToDir(outputArg)) {
+        if (!(await isPathToWriteableDir(outputArg))) {
+            throw new Error(`--output directory is not writeable: "${outputArg}"`);
         }
-        const resultPath = await makeResultFilename(output, url);
+        const resultPath = await makeResultFilename(outputArg, url);
         return (await open(resultPath, "w")).createWriteStream();
     }
     // Case 4, try to write to the given output path.
-    return (await open(output, "w")).createWriteStream();
+    return (await open(outputArg, "w")).createWriteStream();
 };
 export const runConfigForArgs = async (args) => {
     const loggingLevel = args.logging;
@@ -235,11 +285,17 @@ export const runConfigForArgs = async (args) => {
             "chromium).");
     }
     assert(validatedUserDataDir);
-    let binaryPath;
-    // If we weren't passed a path to a browser binary, use the paths to the
-    // playwright binaries.
+    let binaryPath = args.binary_path;
+    // Next, check if the user has specified a webkit build dir. If so,
+    // we check that the user has specified i. the browser is "webkit",
+    // and ii. there is no --binary-path / -x argument specified (since we
+    // infer that from the build dir).
+    const webkitBuildPaths = await getWebkitBuildPaths(args);
+    if (webkitBuildPaths) {
+        binaryPath = webkitBuildPaths.binary;
+    }
     let isUsingPlaywrightBinary = false;
-    if (args.binary_path === undefined) {
+    if (binaryPath === undefined) {
         switch (args.browser) {
             case BrowserType.Brave:
                 throw new Error("Must include a binary path when testing Brave (since " +
@@ -259,12 +315,9 @@ export const runConfigForArgs = async (args) => {
         }
     }
     else {
-        assert(typeof args.binary_path === "string");
-        if (!(await isPathToExecFile(args.binary_path))) {
-            throw new Error(`Invalid binary path. "${args.binary_path}" is not an ` +
-                "executable file.");
+        if (!(await isPathToExecFile(binaryPath))) {
+            throw new Error(`Invalid binary path. "${binaryPath}" is not an ` + "executable file.");
         }
-        binaryPath = args.binary_path;
     }
     assert.ok(binaryPath);
     if (args.height <= 0 || args.width <= 0) {
@@ -290,9 +343,9 @@ export const runConfigForArgs = async (args) => {
     assert(typeof args.height === "number");
     assert(typeof args.width === "number");
     assert(typeof args.seconds === "number");
-    assert(!args.output || typeof args.output === "string");
+    assert(args.output === undefined || typeof args.output === "string");
     const outputPath = args.output;
-    const outputHandle = await handleForResults(outputPath, args.url);
+    const outputHandle = await makeOutputHandle(outputPath, args.url);
     assert(typeof args.preserve_pages === "boolean");
     const preservePages = args.preserve_pages;
     let additionalArgs;
@@ -336,6 +389,7 @@ export const runConfigForArgs = async (args) => {
             height: args.height,
             width: args.width,
         },
+        webkitBuildPaths: webkitBuildPaths,
     };
     if (!shouldIgnoreConfChecks()) {
         let aType;

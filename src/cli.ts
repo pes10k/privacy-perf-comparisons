@@ -12,13 +12,21 @@ import { defaultLaunchArgs, getVersion, runConfigForArgs } from "./config.js";
 import { getLogger, LoggingLevel } from "./logging.js";
 import { BrowserType, MeasurementType } from "./types.js";
 import { Pipeline } from "./pipeline.js";
+import { isDebugMode } from "./utils.js";
 
-const isDebugMode = process.env.PERF_TESTS_DEBUG === "1";
 const defaultArgs = defaultLaunchArgs();
+const isDebugging = isDebugMode();
 
 const parser = new ArgumentParser({
   description: "Run performance tests for a playwright version of a browser.",
   formatter_class: ArgumentDefaultsHelpFormatter,
+});
+parser.add_argument("-a", "--args", {
+  help:
+    "Additional Chromium arguments that are passed along to the shell when " +
+    "launching the browser. So, to pass the argument '--disable-features=x' " +
+    "to the browser, pass '--args disable-features=x'.",
+  nargs: "*",
 });
 parser.add_argument("-b", "--browser", {
   choices: Object.values(BrowserType),
@@ -35,6 +43,13 @@ parser.add_argument("-d", "--user-data-dir", {
     "*Note:* Gecko/Firefox measurements should use this flag for " +
     "specifying the path for storing persistent user data (and not " +
     "--profile).",
+});
+parser.add_argument("-f", "--firefox-user-prefs", {
+  help:
+    "Optional JSON of Firefox about:config overrides and settings. If " +
+    "provided, these will be applied after Playwright's preference " +
+    "overrides. This argument can only be used when the browser argument " +
+    "is 'gecko'.",
 });
 parser.add_argument("--do-not-drop", {
   action: "store_true",
@@ -101,22 +116,16 @@ parser.add_argument("-v", "--version", {
   action: "version",
   version: await getVersion(),
 });
+parser.add_argument("-w", "--webkit-build", {
+  help:
+    "Use a custom build of Webkit. This argument should be the path " +
+    "to the root of git checkout. This argument can " +
+    "only be used i. when the --browser (-b) argument is " +
+    "'webkit' and cannot be used with the --binary-path (-x) argument. " +
+    "(Only supported on MacOS builds currently.)",
+});
 parser.add_argument("-x", "--binary-path", {
   help: "Path to the browser binary to run the measurements with.",
-});
-parser.add_argument("-f", "--firefox-user-prefs", {
-  help:
-    "Optional JSON of Firefox about:config overrides and settings. If " +
-    "provided, these will be applied after Playwright's preference " +
-    "overrides. This argument can only be used when the browser argument " +
-    "is 'gecko'.",
-});
-parser.add_argument("-a", "--args", {
-  help:
-    "Additional Chromium arguments that are passed along to the shell when " +
-    "launching the browser. So, to pass the argument '--disable-features=x' " +
-    "to the browser, pass '--args disable-features=x'.",
-  nargs: "*",
 });
 
 parser.add_argument("--height", {
@@ -135,17 +144,25 @@ try {
   assert(rawArgs instanceof Namespace);
 
   const runConfig = await runConfigForArgs(rawArgs);
-  const logLevel = isDebugMode ? LoggingLevel.Verbose : runConfig.loggingLevel;
+  const logLevel = isDebugging ? LoggingLevel.Verbose : runConfig.loggingLevel;
   const logger = getLogger(logLevel);
   const browserContext = await launch(logger, runConfig);
   const pipeline = new Pipeline(logger, browserContext, runConfig);
   const results = await pipeline.measure(runConfig.url);
-
-  runConfig.output.write(JSON.stringify(results), "utf8", () => {
-    process.exit(0);
-  });
+  const outputString = JSON.stringify(results);
+  runConfig.output.write(
+    outputString + "\n",
+    (error: Error | null | undefined) => {
+      if (error) {
+        logger.error("Error writing result\n");
+        throw error;
+      }
+      runConfig.output.end();
+      process.exit(0);
+    },
+  );
 } catch (err) {
-  if (isDebugMode) {
+  if (isDebugging) {
     throw err;
   }
   if (err instanceof Error) {

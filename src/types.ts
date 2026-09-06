@@ -21,6 +21,12 @@ export interface PersistentLaunchOptions extends LaunchOptions {
   serviceWorkers: "allow" | "block";
 }
 
+export interface WebkitBuildPaths {
+  rootDir: Path;
+  binary: Path;
+  releaseDir: Path;
+}
+
 export enum BrowserType {
   Brave = "brave",
   Chromium = "chromium",
@@ -62,4 +68,5 @@ export interface RunConfig {
     height: number;
     width: number;
   };
+  webkitBuildPaths?: WebkitBuildPaths;
 }

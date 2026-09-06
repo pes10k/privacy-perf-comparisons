@@ -109,7 +109,15 @@ const launchOptionsGecko = (config) => {
     return options;
 };
 const launchOptionsWebKit = (config) => {
-    return launchOptionsDefault(config);
+    const options = launchOptionsDefault(config);
+    if (config.webkitBuildPaths) {
+        options.env = {
+            DYLD_FRAMEWORK_PATH: config.webkitBuildPaths.releaseDir,
+            DYLD_LIBRARY_PATH: config.webkitBuildPaths.releaseDir,
+        };
+    }
+    options.offline = false;
+    return options;
 };
 const browserTypeConfigMapping = {
     [BrowserType.Brave]: {
@@ -136,6 +144,7 @@ export const launch = async (logger, config) => {
     const browser = paramsForBrowser.type;
     const userDataDir = config.userDataDir;
     logger.info("Launching with options: ", { ...opts, userDataDir });
+    logger.verbose("...and config: ", config);
     const context = await browser.launchPersistentContext(userDataDir, opts);
     logger.info("...and launched.");
     return context;

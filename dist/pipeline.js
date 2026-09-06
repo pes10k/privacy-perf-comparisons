@@ -2,6 +2,7 @@ import { assert } from "node:console";
 import { classForType } from "./measurements/structure/mapping.js";
 import { getVersion } from "./config.js";
 const PipelineStep = {
+    BeforeLaunch: "beforeLaunch",
     InstrumentContext: "instrumentContext",
     BeforeStart: "beforeStart",
     Start: "start",
@@ -10,37 +11,32 @@ const PipelineStep = {
 };
 const eventDrainTimeMs = 5 * 1000;
 export class Pipeline {
+    #config;
     #context;
     #logger;
-    #measurementTypes;
     #measurers;
     #numMeasurements;
-    #preservePages;
-    #seconds;
-    #timeout;
     constructor(logger, context, config) {
+        this.#config = JSON.parse(JSON.stringify(config));
         this.#context = context;
         this.#logger = logger.prefixedLogger("Pipeline:");
-        this.#measurementTypes = config.measurements;
         this.#measurers = {};
         this.#numMeasurements = config.measurements.length;
-        this.#preservePages = config.preservePages;
-        this.#seconds = config.seconds;
-        this.#timeout = config.timeout;
     }
     async measure(url) {
         const log = this.#logger;
         // Unless we're preserving existing pages, we need to force things to
         // start in a clean profile by closing all open pages, and then
         // re-enabling networking .
-        if (!this.#preservePages) {
+        if (!this.#config.preservePages) {
             await this.#closePages();
         }
-        for (const aMeasurementType of this.#measurementTypes) {
+        for (const aMeasurementType of this.#config.measurements) {
             const measurerType = classForType(aMeasurementType);
-            const measurer = new measurerType(this.#logger, url, this.#context);
+            const measurer = new measurerType(this.#logger, url, this.#context, this.#config);
             this.#measurers[aMeasurementType] = measurer;
         }
+        await this.#runStep(PipelineStep.BeforeLaunch);
         await this.#runStep(PipelineStep.InstrumentContext);
         await this.#runStep(PipelineStep.BeforeStart);
         await this.#runStep(PipelineStep.Start);
@@ -49,13 +45,13 @@ export class Pipeline {
         const startTime = new Date();
         log.info(`Navigating to url="${page.url()}"`);
         const navRequest = await page.goto(url.toString(), {
-            timeout: this.#timeout * 1000,
+            timeout: this.#config.timeout * 1000,
             waitUntil: "commit",
         });
         assert(navRequest);
         log.info(`Arrived at url="${page.url()}"`);
-        log.verbose(`Letting page load for "${String(this.#seconds)}" seconds`);
-        await page.waitForTimeout(this.#seconds * 1000);
+        log.verbose(`Page load for "${String(this.#config.seconds)}" seconds`);
+        await page.waitForTimeout(this.#config.seconds * 1000);
         await this.#runStep(PipelineStep.Close);
         await page.waitForTimeout(eventDrainTimeMs);
         const results = await this.#runStep(PipelineStep.Collect);
@@ -85,18 +81,19 @@ export class Pipeline {
     }
     async #runStep(stepName) {
         const logger = this.#logger.prefixedLogger(`runStep:${stepName}: `);
-        logger.verbose("Start");
+        logger.verbose(`Starting step ${stepName}`);
         const stepPromises = [];
         for (const aMeasurer of Object.values(this.#measurers)) {
-            const measureStepMethod = aMeasurer[stepName];
+            logger.debug(` - Starting ${aMeasurer.type}`);
+            const measureStepMethod = aMeasurer[stepName].bind(aMeasurer);
             assert(typeof measureStepMethod === "function");
             stepPromises.push(measureStepMethod());
         }
-        logger.verbose("End");
+        logger.verbose(`Ending step ${stepName}`);
         const orderedResults = await Promise.all(stepPromises);
         const results = {};
         for (let i = 0; i < this.#numMeasurements; i += 1) {
-            const aType = this.#measurementTypes[i];
+            const aType = this.#config.measurements[i];
             const aResult = orderedResults[i] === null
                 ? null
                 : orderedResults[i];

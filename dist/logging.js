@@ -26,12 +26,8 @@ const baseLogFunc = (isError, prefix, ...msg) => {
         else if (typeof aMsgPart === "number") {
             messageParts.push(String(aMsgPart));
         }
-        else if (typeof aMsgPart === "object") {
-            messageParts.push(JSON.stringify(aMsgPart));
-        }
         else {
-            // eslint-disable-next-line @typescript-eslint/no-base-to-string
-            messageParts.push(String(aMsgPart));
+            messageParts.push(JSON.stringify(aMsgPart));
         }
     }
     const finalMessage = messageParts.join("");

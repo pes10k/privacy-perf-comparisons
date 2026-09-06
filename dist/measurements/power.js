@@ -4,9 +4,11 @@ import { EOL } from "node:os";
 import psTree from "ps-tree";
 import { BaseMeasurer } from "./structure/base.js";
 import { MeasurementType } from "../types.js";
+import { canDropSudoLevels, dropSudoLevels } from "../utils.js";
 const powerUtil = "powermetrics";
+const samplingInterval = "350";
 const sampleEnd = "ALL_TASKS ";
-const headerRegex = /Name[ ]+(<id_col>ID[ ]+).*(<gpu_col>GPU ms\/s[ ]+)Energy Impact/d;
+const headerRegex = /Name[ ]+(?<id_col>ID[ ]+).*(?<gpu_col>GPU ms\/s[ ]+)Energy Impact/d;
 const isEndOfSample = (line) => {
     return line.startsWith(sampleEnd);
 };
@@ -26,7 +28,7 @@ const buildFrameParser = (line) => {
         if (isEndOfSample(line)) {
             return undefined;
         }
-        const idValue = parseInt(line.substring(0, idColWidth[1]), 10);
+        const idValue = parseInt(line.substring(idColWidth[0], idColWidth[1]), 10);
         const gpuText = line.substring(gpuColWidth[0], gpuColWidth[1]);
         const gpuValue = Number.parseFloat(gpuText);
         const energyText = line.substring(energyColWidth[0]);
@@ -43,26 +45,36 @@ export class PowerMeasurer extends BaseMeasurer {
     #browserPids;
     #datapoints;
     #powermetricsProcess;
-    static async validate() {
+    static async validate(config) {
         return new Promise((resolve, reject) => {
+            // Just a throw-away quick-run set of commands to test if we can
+            // run the tool at all.
             exec(`${powerUtil} -n 1 -i 100`, (error) => {
                 if (error) {
                     reject(error);
                     return;
                 }
-                resolve(undefined);
+                if (config.shouldDropPermissions && !canDropSudoLevels()) {
+                    const err = new Error("Unable to automatically drop permission, could not find ENV " +
+                        `variables SUDO_UID='${String(process.env.SUDO_UID)}' and ` +
+                        `SUDO_GID='${String(process.env.SUDO_GID)}'.`);
+                    reject(err);
+                }
+                else {
+                    resolve(undefined);
+                }
             });
         });
     }
-    constructor(logger, url, context) {
-        super(logger, url, context);
+    constructor(logger, url, context, config) {
+        super(logger, url, context, config);
         this.#browserPids = new Map();
         this.#datapoints = new Map();
     }
     async beforeLaunch() {
         const powerUtilArgs = [
             "-i",
-            "500",
+            samplingInterval,
             "--samplers",
             "tasks",
             "--show-process-energy",
@@ -72,7 +84,8 @@ export class PowerMeasurer extends BaseMeasurer {
             const childProcess = spawn(powerUtil, powerUtilArgs);
             childProcess.stdout.on("data", (data) => {
                 let frameParser;
-                for (const aLine of data.split(EOL)) {
+                const parts = String(data).split(EOL);
+                for (const aLine of parts) {
                     if (!frameParser) {
                         frameParser = buildFrameParser(aLine);
                         continue;
@@ -98,14 +111,26 @@ export class PowerMeasurer extends BaseMeasurer {
                     }
                 }
             });
-            if (childProcess.pid) {
-                this.#powermetricsProcess = childProcess;
-                resolve(undefined);
-            }
-            else {
+            if (!childProcess.pid) {
                 const msg = `Error launching: ${powerUtil} ` + powerUtilArgs.join(" ");
                 reject(new Error(msg));
+                return;
             }
+            this.#powermetricsProcess = childProcess;
+            if (this.config.shouldDropPermissions) {
+                this.logVerbose("About to drop permissions...");
+                const dropResult = dropSudoLevels();
+                if (!dropResult?.success) {
+                    reject(new Error("Error dropping permissions"));
+                    return;
+                }
+                this.logVerbose("...successfully dropped. From " +
+                    `UID='${String(dropResult.prev.uid)}', ` +
+                    `GID='${String(dropResult.prev.gid)}` +
+                    ` to UID='${String(dropResult.current.uid)}', ` +
+                    `GID='${String(dropResult.current.uid)}'`);
+            }
+            resolve(undefined);
         });
     }
     // When closing this measurement probe, capture all the process ids
@@ -124,7 +149,8 @@ export class PowerMeasurer extends BaseMeasurer {
                     reject(err);
                     return;
                 }
-                for (const aChild of children) {
+                for (const aChildPoint of children) {
+                    const aChild = aChildPoint;
                     const childPid = parseInt(aChild.PID, 10);
                     if (childPid === powermetricsPid) {
                         continue;
@@ -134,11 +160,11 @@ export class PowerMeasurer extends BaseMeasurer {
                         powermetricsPids.add(childPid);
                         continue;
                     }
-                    this.#browserPids.set(childPid, aChild.COMMAND);
+                    this.#browserPids.set(childPid, aChild.COMM);
                 }
                 if (this.#browserPids.size === 0) {
                     this.logError("Could not find the process ids for the browser.");
-                    this.logError("Child processes: ", children.map((x) => x.COMMAND));
+                    this.logError("Child processes: ", children);
                     reject(new Error("Could not find browser process id(s)"));
                     return;
                 }
@@ -147,7 +173,39 @@ export class PowerMeasurer extends BaseMeasurer {
         });
     }
     collect() {
-        throw new Error("Method not implemented.");
+        const processTotals = {};
+        let powerTotal = 0.0;
+        let gpuTotal = 0.0;
+        for (const [aPid, processName] of this.#browserPids.entries()) {
+            // for (const [aPid, datapoints] of this.#datapoints.entries()) {
+            const processTotal = {
+                pid: aPid,
+                command: processName,
+                energy: 0,
+                gpu: 0,
+            };
+            const datapoints = this.#datapoints.get(aPid);
+            if (datapoints) {
+                for (const aDatapoint of datapoints) {
+                    processTotal.energy += aDatapoint.energy;
+                    processTotal.gpu += aDatapoint.gpu;
+                }
+                processTotals[aPid] = processTotal;
+                powerTotal += processTotal.energy;
+                gpuTotal += processTotal.gpu;
+            }
+        }
+        const result = {
+            type: MeasurementType.Power,
+            data: {
+                processes: processTotals,
+                totals: {
+                    power: powerTotal,
+                    gpu: gpuTotal,
+                },
+            },
+        };
+        return Promise.resolve(result);
     }
 }
 //# sourceMappingURL=power.js.map

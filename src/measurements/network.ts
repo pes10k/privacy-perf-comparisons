@@ -11,13 +11,7 @@ import {
 
 import { BaseMeasurer, MeasurementResult } from "./structure/base.js";
 import { Logger, LoggingLevel } from "../logging.js";
-import {
-  BrowserType,
-  MeasurementType,
-  RunConfig,
-  Serializable,
-  WSFrame,
-} from "../types.js";
+import { MeasurementType, RunConfig, Serializable, WSFrame } from "../types.js";
 
 type SecurityContext = string | null;
 type HTTPHeaders = { name: string; value: string }[];
@@ -408,35 +402,13 @@ export class NetworkMeasurer extends BaseMeasurer {
   readonly type = MeasurementType.Network;
   readonly #netLogger: ContextNetworkLogger;
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  static override async validate(config: RunConfig): Promise<undefined> {
-    // Only some measurements require the playwright-modified binaries; some
-    // tests will run fine even in stock versions of Firefox, Safari, etc.
-    // Here we check 1. if any of the measurements we're about to run (specified
-    // with --measurements) require the capabilities that playwright patches into
-    // Gecko and WebKit, and 2. if it looks like the binary we're about to run
-    // those measurements (specified with --binary-path) includes those
-    // capabilities.
-    if (
-      config.browser === BrowserType.Brave ||
-      config.browser === BrowserType.Chromium
-    ) {
-      return;
-    }
-
-    if (config.isUsingPlaywrightBinary) {
-      return;
-    }
-
-    throw new Error(
-      "The specified measurements cannot be run in the " +
-        "specified browser. These measurements require either a Chromium " +
-        "browser, or a browser including the playwright patches.",
-    );
-  }
-
-  constructor(logger: Logger, url: URL, context: BrowserContext) {
-    super(logger, url, context);
+  constructor(
+    logger: Logger,
+    url: URL,
+    context: BrowserContext,
+    config: RunConfig,
+  ) {
+    super(logger, url, context, config);
     this.#netLogger = new ContextNetworkLogger(logger);
   }
 

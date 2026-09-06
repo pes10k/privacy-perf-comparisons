@@ -13,6 +13,7 @@ export interface BaseMeasurerChild {
     logger: Logger,
     url: URL,
     context: BrowserContext,
+    config: RunConfig,
   ): BaseMeasurer;
   validate(config: RunConfig): Promise<undefined>;
 }
@@ -22,6 +23,7 @@ export type MeasurerStepSignature = Promise<undefined> | Promise<MeasurementResu
 export abstract class BaseMeasurer {
   abstract readonly type: MeasurementType;
 
+  readonly config: RunConfig;
   readonly context: BrowserContext;
   readonly logger: Logger;
   readonly url: URL;
@@ -39,7 +41,13 @@ export abstract class BaseMeasurer {
     // pass
   }
 
-  constructor(logger: Logger, url: URL, context: BrowserContext) {
+  constructor(
+    logger: Logger,
+    url: URL,
+    context: BrowserContext,
+    config: RunConfig
+  ) {
+    this.config = config;
     this.logger = logger;
     this.url = url;
     this.context = context;

@@ -113,8 +113,8 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
     #pid;
     #measurements = [];
     #intervalId = undefined;
-    constructor(logger, url, context) {
-        super(logger, url, context);
+    constructor(logger, url, context, config) {
+        super(logger, url, context, config);
         this.#pid = process.pid;
     }
     async beforeStart() {

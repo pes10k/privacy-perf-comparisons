@@ -2,7 +2,7 @@ import pidusage from "pidusage";
 import psTree, { PS } from "ps-tree";
 
 import { BaseMeasurer, MeasurementResult } from "./structure/base.js";
-import { MeasurementType } from "../types.js";
+import { MeasurementType, RunConfig } from "../types.js";
 import { Logger } from "../logging.js";
 import { BrowserContext } from "@playwright/test";
 
@@ -156,8 +156,13 @@ export class MemoryCPUMeasurer extends BaseMeasurer {
 
   #intervalId?: NodeJS.Timeout = undefined;
 
-  constructor(logger: Logger, url: URL, context: BrowserContext) {
-    super(logger, url, context);
+  constructor(
+    logger: Logger,
+    url: URL,
+    context: BrowserContext,
+    config: RunConfig,
+  ) {
+    super(logger, url, context, config);
     this.#pid = process.pid;
   }
 

@@ -6,6 +6,14 @@ Browser Perf Logger
 
 Add `power` measurement.
 
+Add `--webkit-build (-w)` command, to run performance tests from a local
+Webkit build.
+
+Restructure code and measurements to use the `Pipeline` class (to semi-better
+standardize how all measurements can plug into and interact with the
+playwright-managed browser context).
+
+
 0.2.7
 ---
 
